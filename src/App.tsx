@@ -1,4 +1,19 @@
 import { useState, useRef, useEffect } from "react";
+import { supabase, supabaseConfigured, IoptRow } from "./supabase";
+
+// Calls the server-side Coach endpoint (api/coach.js). The Claude API key never reaches the browser.
+async function askClaude(messages: { role: string; content: string }[], mode: "coach" | "report" = "coach"): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const res = await fetch("/api/coach", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + (token || "") },
+    body: JSON.stringify({ mode, messages }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || "Something went wrong. Try again.");
+  return json.text || "";
+}
 
 const G = {
   green: "#578B38", greenDark: "#3D6425", greenPale: "#EDF4E6",
@@ -202,29 +217,7 @@ function KiteProfile({ profile }: any) {
   );
 }
 
-function ScoreInput({ profile, setProfile }: any) {
-  return (
-    <div style={{background:G.offWhite,border:"1px solid "+G.border,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
-      <p style={{fontSize:10,color:G.green,textTransform:"uppercase" as const,letterSpacing:2,fontWeight:"bold",margin:"0 0 12px"}}>Enter I-OPT Scores (out of 50)</p>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-        {Object.entries(STYLES).map(([st,sv]:any) => (
-          <div key={st} style={{background:"#fff",border:"1.5px solid "+sv.border,borderRadius:12,padding:"10px 12px"}}>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:7}}>
-              <div style={{width:20,height:20,borderRadius:10,background:sv.color,color:"#fff",fontSize:9,fontWeight:"bold",display:"flex",alignItems:"center",justifyContent:"center"}}>{st}</div>
-              <span style={{fontSize:11,fontWeight:"bold",color:sv.color}}>{sv.label}</span>
-            </div>
-            <input type="number" min={0} max={50} value={profile[st]}
-              onChange={(e:any) => setProfile((p:any) => ({...p,[st]:Math.min(50,Math.max(0,Number(e.target.value)))}))}
-              style={{width:"100%",border:"1.5px solid "+sv.border,borderRadius:8,padding:"6px 8px",fontSize:20,fontWeight:"bold",color:sv.color,outline:"none",fontFamily:"Georgia,serif",textAlign:"center" as const,background:sv.light,boxSizing:"border-box" as const}}/>
-            <p style={{fontSize:9,color:G.charcoalLight,margin:"3px 0 0",textAlign:"center" as const}}>out of 50</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ProfileTab({ profile, setProfile }: any) {
+function ProfileTab({ profile }: any) {
   const dom = dominant(profile);
   const s = STYLES[dom];
   const pat = getPattern(profile);
@@ -305,20 +298,17 @@ function ProfileTab({ profile, setProfile }: any) {
 
       <h3 style={{fontSize:13,fontWeight:"bold",color:G.charcoal,margin:"0 0 14px"}}>Your Strategic Profile (Kite)</h3>
       <KiteProfile profile={profile}/>
-      <ScoreInput profile={profile} setProfile={setProfile}/>
+      <p style={{fontSize:10,color:G.charcoalLight,textAlign:"center" as const,margin:"0 0 8px"}}>Scores from your I-OPT assessment (out of 50)</p>
     </div>
   );
 }
 
-function TeamTab({ profile, team, setTeam }: any) {
-  const [name, setName] = useState("");
-  const [style, setStyle] = useState("RS");
+function TeamTab({ profile, team, teamName }: any) {
   const dom = dominant(profile);
   const all = [dom, ...team.map((m:any) => m.style)];
   const counts: any = Object.fromEntries(Object.keys(STYLES).map(s => [s,0]));
   all.forEach((s:string) => counts[s]++);
   const missing = Object.entries(counts).filter(([,v]:any) => v===0).map(([k]) => k);
-  const add = () => { if (!name.trim()) return; setTeam((t:any) => [...t,{name:name.trim(),style}]); setName(""); };
   return (
     <div>
       <div style={{background:"linear-gradient(135deg,"+G.greenPale+",#fff)",border:"1px solid "+G.greenBorder,borderRadius:14,padding:"12px 16px",marginBottom:16,display:"flex",gap:10,alignItems:"center"}}>
@@ -329,7 +319,7 @@ function TeamTab({ profile, team, setTeam }: any) {
         </div>
       </div>
       <div style={{background:G.offWhite,borderRadius:16,padding:16,marginBottom:18}}>
-        <p style={{fontSize:10,color:"#94A3B8",textTransform:"uppercase" as const,letterSpacing:2,fontWeight:"bold",margin:"0 0 12px"}}>Team Composition · {all.length} people</p>
+        <p style={{fontSize:10,color:"#94A3B8",textTransform:"uppercase" as const,letterSpacing:2,fontWeight:"bold",margin:"0 0 12px"}}>{teamName ? teamName+" · " : ""}Team Composition · {all.length} people</p>
         <div style={{display:"flex",gap:12,flexWrap:"wrap" as const,marginBottom:10}}>
           {Object.entries(counts).map(([st,ct]:any) => (
             <div key={st} style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:4,opacity:ct===0?0.2:1}}>
@@ -351,6 +341,7 @@ function TeamTab({ profile, team, setTeam }: any) {
         <div style={{background:G.greenPale,border:"1px solid "+G.greenBorder,borderRadius:10,padding:"8px 12px",fontSize:11,color:G.charcoal,marginTop:8}}>📊 Teams spend ~16 hrs/week miscommunicating · $18K+ per team in non-productive conflict</div>
       </div>
       <h3 style={{fontSize:13,fontWeight:"bold",color:G.charcoal,margin:"0 0 10px"}}>Members</h3>
+      {team.length===0 && <p style={{fontSize:12,color:G.charcoalLight}}>No teammates have been added yet.</p>}
       <div style={{display:"inline-flex",alignItems:"center",gap:6,marginBottom:10,background:STYLES[dom].light,border:"1px solid "+STYLES[dom].border,borderRadius:20,padding:"4px 12px"}}>
         <Badge style={dom} size="sm"/><span style={{fontSize:11,fontWeight:"bold",color:STYLES[dom].color}}>You · {dom} · "{STYLES[dom].motto}"</span>
       </div>
@@ -360,19 +351,12 @@ function TeamTab({ profile, team, setTeam }: any) {
             <Badge style={m.style} size="sm"/>
             <div>
               <p style={{fontWeight:"bold",fontSize:13,color:"#1E293B",margin:0}}>{m.name}</p>
-              <p style={{fontSize:11,color:"#64748B",margin:"1px 0 0"}}>{STYLES[m.style].label} · "{STYLES[m.style].motto}"</p>
+              <p style={{fontSize:11,color:"#64748B",margin:"1px 0 0"}}>{STYLES[m.style].label} · {m.pattern}</p>
+              <p style={{fontSize:10,color:"#64748B",margin:"2px 0 0"}}>RS {m.scores.RS} · LP {m.scores.LP} · RI {m.scores.RI} · HA {m.scores.HA}</p>
             </div>
           </div>
-          <button onClick={() => setTeam((t:any) => t.filter((_:any,idx:number) => idx!==i))} style={{background:"none",border:"none",color:"#CBD5E1",fontSize:20,cursor:"pointer",lineHeight:1,padding:4}}>×</button>
         </div>
       ))}
-      <div style={{display:"flex",gap:8,marginTop:12}}>
-        <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => e.key==="Enter" && add()} placeholder="Member name" style={{flex:1,border:"1.5px solid "+G.border,borderRadius:12,padding:"10px 14px",fontSize:13,outline:"none",fontFamily:"Georgia,serif"}}/>
-        <select value={style} onChange={e => setStyle(e.target.value)} style={{border:"1.5px solid "+G.border,borderRadius:12,padding:"10px 6px",fontSize:12,outline:"none",fontFamily:"Georgia,serif"}}>
-          {Object.entries(STYLES).map(([k,v]:any) => <option key={k} value={k}>{k} — {v.label}</option>)}
-        </select>
-        <button onClick={add} style={{background:G.green,color:"#fff",border:"none",borderRadius:12,padding:"10px 16px",fontSize:16,fontWeight:"bold",cursor:"pointer"}}>+</button>
-      </div>
     </div>
   );
 }
@@ -441,8 +425,6 @@ function ReportsTab({ profile, team }: any) {
   const selRpt = REPORT_TYPES.find(r => r.id===selected);
   const myPat = getPattern(profile);
 
-  const sys = "You are an expert I-OPT certified coach and PeopleGro Insights facilitator. RS 'He who hesitates is lost!': fast action-first. Gift: keeps things moving. LP 'Do it once, do it right!': structured quality-first. Gift: ensures quality. RI 'There is always a better way!': innovative big-picture. Gift: creative solutions. HA 'Think!! Then act.': systemic ponder-first. Gift: holds complex systems. Patterns: Performer(RS+LP), Conservator(LP+HA), Perfector(HA+RI), Changer(RI+RS). PeopleGro: How Matters. $18K+ per team non-productive conflict. ~16hrs/week miscommunicating. Scores out of 50. Be practical, specific, grounded. Never generic.";
-
   const buildPrompt = () => {
     const p = profile;
     const pStr = `RS:${p.RS}/50 LP:${p.LP}/50 RI:${p.RI}/50 HA:${p.HA}/50`;
@@ -461,9 +443,7 @@ function ReportsTab({ profile, team }: any) {
   const generate = async () => {
     setGenerating(true); setReport(null);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:800, system:sys, messages:[{role:"user",content:buildPrompt()}] }) });
-      const data = await res.json();
-      const text = data.content?.find((b:any) => b.type==="text")?.text || "";
+      const text = await askClaude([{ role:"user", content:buildPrompt() }], "report");
       const parsed = JSON.parse(text.replace(/```json|```/g,"").trim());
       setReport({ type:selected, content:parsed });
     } catch(e) { setReport({ error:true }); }
@@ -618,16 +598,15 @@ function ResourcesTab() {
   );
 }
 
-function CoachTab({ profile, team }: any) {
-  const [messages, setMessages] = useState([{ role:"assistant", content:"Hi! I'm your PeopleGro Insights AI Coach — trained on the full I-OPT framework including all four styles, strategic patterns, and the philosophy that How Matters.\n\nI know your profile and your team. What would you like to explore?" }]);
+function CoachTab({ profile, team, firstName }: any) {
+  const dom0 = dominant(profile), pat0 = getPattern(profile);
+  const greeting = "Hi " + firstName + "! I'm your PeopleGro Insights Coach. I know your I-OPT profile (" + dom0 + " dominant" + (pat0 ? ", " + pat0[0] + " pattern" : "") + ")" + (team.length>0 ? " and your team's profiles" : "") + ".\n\nWhat would you like to work on?";
+  const [messages, setMessages] = useState([{ role:"assistant", content:greeting }]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<any>(null);
-  const dom = dominant(profile);
-  const myPat = getPattern(profile);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages]);
 
-  const sys = `You are an expert I-OPT certified coach and PeopleGro Insights facilitator. USER: RS${profile.RS}/50 LP${profile.LP}/50 RI${profile.RI}/50 HA${profile.HA}/50. Dominant:${dom}('${STYLES[dom].motto}'). Gift:${STYLES[dom].gift}. Pattern:${myPat?myPat[0]:"Mixed"}. TEAM:${team.length>0?team.map((m:any)=>m.name+"("+m.style+")").join(", "):"No team added"}. RS fast action-first. LP structured quality-first. RI innovative big-picture. HA systemic ponder-first. Patterns: Performer(RS+LP), Conservator(LP+HA), Perfector(HA+RI), Changer(RI+RS). How Matters — self-awareness elevates all skills. Friction inevitable, embrace it. Be practical, specific, 3-5 sentences, never generic.`;
 
   const send = async () => {
     if (!input.trim() || loading) return;
@@ -635,15 +614,18 @@ function CoachTab({ profile, team }: any) {
     const next = [...messages, msg];
     setMessages(next); setInput(""); setLoading(true);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600, system:sys, messages:next.map(m => ({ role:m.role, content:m.content })) }) });
-      const data = await res.json();
-      const reply = data.content?.find((b:any) => b.type==="text")?.text || "Something went wrong.";
-      setMessages(p => [...p,{ role:"assistant", content:reply }]);
-    } catch(e) { setMessages(p => [...p,{ role:"assistant", content:"Something went wrong. Try again." }]); }
+      const reply = await askClaude(next.slice(1).map(m => ({ role:m.role, content:m.content })));
+      setMessages(p => [...p,{ role:"assistant", content:reply || "Something went wrong. Try again." }]);
+    } catch(e:any) { setMessages(p => [...p,{ role:"assistant", content:e?.message || "Something went wrong. Try again." }]); }
     setLoading(false);
   };
 
-  const suggestions = ["What is my strategic pattern?","How do I manage friction with an LP?","How should I communicate with my team?","What is my biggest blind spot?","How do I sell to an HA client?"];
+  const suggestions = [
+    "What does my " + (pat0 ? pat0[0] : "strategic") + " pattern mean day to day?",
+    ...team.slice(0,2).map((m:any) => "How do I work best with " + m.name + "?"),
+    "How should I communicate with my team?",
+    "What is my biggest blind spot?",
+  ];
 
   return (
     <div style={{display:"flex",flexDirection:"column" as const}}>
@@ -670,16 +652,94 @@ function CoachTab({ profile, team }: any) {
   );
 }
 
+function toProfile(r: IoptRow) {
+  return { RS:Number(r.rs), LP:Number(r.lp), RI:Number(r.ri), HA:Number(r.ha) };
+}
+
+const shell = (children: any) => (
+  <div style={{minHeight:"100vh",background:"#F0F4EE",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"20px 12px",fontFamily:"Georgia,'Times New Roman',serif"}}>
+    <div style={{width:"100%",maxWidth:520,background:"#fff",borderRadius:28,boxShadow:"0 16px 64px rgba(0,0,0,0.10)",overflow:"hidden"}}>{children}</div>
+  </div>
+);
+
+function SignIn() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle"|"sending"|"sent"|"error">("idle");
+  const [err, setErr] = useState("");
+  const send = async () => {
+    if (!email.trim()) return;
+    setStatus("sending"); setErr("");
+    const { error } = await supabase.auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { emailRedirectTo: window.location.origin } });
+    if (error) { setStatus("error"); setErr(error.message); } else setStatus("sent");
+  };
+  return shell(
+    <div style={{padding:"28px 26px 32px"}}>
+      <Logo/>
+      <h2 style={{fontSize:20,color:G.charcoal,margin:"22px 0 6px"}}>Sign in</h2>
+      {status==="sent" ? (
+        <div style={{background:G.greenPale,border:"1px solid "+G.greenBorder,borderRadius:14,padding:"14px 16px",fontSize:13,color:G.charcoal,lineHeight:1.6}}>
+          Check your inbox. We sent a sign-in link to <strong>{email.trim()}</strong>. Open it on this device to continue.
+        </div>
+      ) : (
+        <>
+          <p style={{fontSize:13,color:G.charcoalLight,margin:"0 0 16px",lineHeight:1.6}}>Enter your work email and we'll send you a link. No password needed.</p>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key==="Enter" && send()} placeholder="you@company.com" style={{width:"100%",border:"1.5px solid "+G.border,borderRadius:12,padding:"12px 14px",fontSize:14,outline:"none",fontFamily:"Georgia,serif",boxSizing:"border-box" as const,marginBottom:10}}/>
+          <button onClick={send} disabled={status==="sending"} style={{width:"100%",padding:"13px",borderRadius:14,fontSize:14,fontWeight:"bold",background:status==="sending"?"#CBD5E1":G.green,color:"#fff",border:"none",cursor:"pointer",fontFamily:"Georgia,serif"}}>{status==="sending" ? "Sending…" : "Email me a sign-in link"}</button>
+          {status==="error" && <p style={{fontSize:12,color:"#991B1B",marginTop:10}}>{err}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
+function Message({ title, body, onSignOut }: any) {
+  return shell(
+    <div style={{padding:"28px 26px 32px"}}>
+      <Logo/>
+      <h2 style={{fontSize:18,color:G.charcoal,margin:"22px 0 8px"}}>{title}</h2>
+      <p style={{fontSize:13,color:G.charcoalLight,lineHeight:1.6,margin:"0 0 16px"}}>{body}</p>
+      {onSignOut && <button onClick={onSignOut} style={{background:"none",border:"1.5px solid "+G.border,borderRadius:12,padding:"8px 14px",fontSize:12,color:G.charcoal,cursor:"pointer",fontFamily:"Georgia,serif"}}>Sign out</button>}
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState("Profile");
-  const [profile, setProfile] = useState({ RS:18, LP:22, RI:32, HA:38 });
-  const [team, setTeam] = useState([{ name:"Alex", style:"LP" },{ name:"Jordan", style:"RS" }]);
+  const [session, setSession] = useState<any>(undefined);
+  const [me, setMe] = useState<IoptRow | null | undefined>(undefined);
+  const [rows, setRows] = useState<IoptRow[]>([]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const email = session?.user?.email?.toLowerCase();
+  useEffect(() => {
+    if (!email) { setMe(undefined); setRows([]); return; }
+    supabase.from("iopt_profiles").select("*").then(({ data }) => {
+      const all = (data || []) as IoptRow[];
+      setRows(all);
+      setMe(all.find(r => r.email.toLowerCase()===email) || null);
+    });
+  }, [email]);
+
+  const signOut = () => supabase.auth.signOut();
+
+  if (!supabaseConfigured) return <Message title="Setup needed" body="This app is not connected to its database yet. Add REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY in Vercel."/>;
+  if (session===undefined || (session && me===undefined)) return <Message title="Loading…" body="One moment."/>;
+  if (!session) return <SignIn/>;
+  if (me===null) return <Message title="No profile yet" body={"We couldn't find an I-OPT profile for " + email + ". If you've taken the assessment, contact your PeopleGro facilitator to get it added."} onSignOut={signOut}/>;
+
+  const profile = toProfile(me!);
+  const team = rows.filter(r => r.email.toLowerCase()!==email && r.team===me!.team).map(r => ({
+    name: r.first_name, style: r.dominant, secondary: r.secondary, pattern: r.pattern, scores: toProfile(r),
+  }));
   const dom = dominant(profile);
 
-  return (
-    <div style={{minHeight:"100vh",background:"#F0F4EE",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"20px 12px",fontFamily:"Georgia,'Times New Roman',serif"}}>
-      <div style={{width:"100%",maxWidth:520,background:"#fff",borderRadius:28,boxShadow:"0 16px 64px rgba(0,0,0,0.10)",overflow:"hidden"}}>
-
+  return shell(
+    <>
         {/* Header */}
         <div style={{background:"#fff",padding:"16px 22px 14px",borderBottom:"2px solid "+G.greenBorder}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -689,7 +749,10 @@ export default function App() {
               <span style={{color:"rgba(255,255,255,0.7)",fontSize:9}}>{STYLES[dom].label.split(" ")[0]}</span>
             </div>
           </div>
-          <p style={{color:G.charcoalLight,fontSize:10,margin:"7px 0 0",fontStyle:"italic"}}>"{STYLES[dom].motto}" · Powered by I-OPT®</p>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",margin:"7px 0 0"}}>
+            <p style={{color:G.charcoalLight,fontSize:10,margin:0,fontStyle:"italic"}}>{me!.first_name} · "{STYLES[dom].motto}" · Powered by I-OPT®</p>
+            <button onClick={signOut} style={{background:"none",border:"none",color:G.charcoalLight,fontSize:10,cursor:"pointer",textDecoration:"underline",fontFamily:"Georgia,serif",padding:0}}>Sign out</button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -703,14 +766,13 @@ export default function App() {
 
         {/* Content */}
         <div style={{padding:"20px 20px 24px",overflowY:"auto" as const,maxHeight:"75vh"}}>
-          {tab==="Profile" && <ProfileTab profile={profile} setProfile={setProfile}/>}
-          {tab==="Team" && <TeamTab profile={profile} team={team} setTeam={setTeam}/>}
+          {tab==="Profile" && <ProfileTab profile={profile}/>}
+          {tab==="Team" && <TeamTab profile={profile} team={team} teamName={me!.team}/>}
           {tab==="Patterns" && <PatternsTab profile={profile} team={team}/>}
           {tab==="Reports" && <ReportsTab profile={profile} team={team}/>}
           {tab==="Resources" && <ResourcesTab/>}
-          {tab==="Coach" && <CoachTab profile={profile} team={team}/>}
+          {tab==="Coach" && <CoachTab profile={profile} team={team} firstName={me!.first_name}/>}
         </div>
-      </div>
-    </div>
+    </>
   );
 }
