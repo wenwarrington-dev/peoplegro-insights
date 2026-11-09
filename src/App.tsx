@@ -247,7 +247,24 @@ function Pills({ items, value, onChange }: { items: [string, string][]; value: s
 }
 
 function Logo() {
-  return <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}><span style={{ fontSize: 19, fontWeight: "bold", color: C.brand }}>PeopleGro</span><span style={{ fontSize: 19, color: C.brandLight }}>Insights</span></div>;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <svg width="40" height="40" viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M50 18 C50 18 28 36 28 57 C28 70 38 80 50 82 C62 80 72 70 72 57 C72 36 50 18 50 18Z" fill="#578B38" />
+        <path d="M50 28 C50 28 16 46 20 72 C22 84 36 90 50 82 C34 74 26 63 30 50 C34 37 50 28 50 28Z" fill="#455048" opacity={0.45} />
+        <path d="M50 28 C50 28 84 46 80 72 C78 84 64 90 50 82 C66 74 74 63 70 50 C66 37 50 28 50 28Z" fill="#B01B43" opacity={0.85} />
+        <circle cx="50" cy="54" r="9" fill="#578B38" />
+        <circle cx="50" cy="50" r="5" fill="#455048" opacity={0.35} />
+      </svg>
+      <div>
+        <div style={{ lineHeight: 1.1 }}>
+          <span style={{ fontSize: 20, fontWeight: 400, color: "#578B38", fontFamily: FONT }}>people</span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: "#455048", fontFamily: FONT }}>gro</span>
+        </div>
+        <div style={{ fontSize: 9, fontWeight: 700, color: "#578B38", letterSpacing: 3, textTransform: "uppercase" }}>Insights</div>
+      </div>
+    </div>
+  );
 }
 
 function PrintButton() {
