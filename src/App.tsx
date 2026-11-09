@@ -689,14 +689,23 @@ function PracticeTab() {
 // ---------------------------------------------------------------------------
 // Reports and Resources
 // ---------------------------------------------------------------------------
-function ReportsTab({ a }: any) {
+function ReportsTab({ a, email }: any) {
+  const [state, setState] = useState<"idle" | "loading" | "missing">("idle");
+  const download = async () => {
+    setState("loading");
+    const { data, error } = await supabase.storage.from("reports").createSignedUrl(email + ".pdf", 120);
+    if (error || !data?.signedUrl) { setState("missing"); return; }
+    setState("idle");
+    window.open(data.signedUrl, "_blank", "noopener");
+  };
   return (
     <div style={col(14)}>
       <b style={{ fontSize: 20, color: C.ink }}>Reports</b>
       <div style={{ border: "2px solid " + C.line, borderRadius: 16, padding: 18, ...col(10) }}>
         <b style={{ fontSize: 16 }}>Your I-OPT Individual Report</b>
         <span style={{ fontSize: 13, lineHeight: 1.55, color: C.sub }}>The full report from your session, the same one PeopleGro walked you through.</span>
-        <button disabled style={{ alignSelf: "flex-start", background: C.neutral, color: C.muted, border: "1px solid " + C.pillLine, borderRadius: 22, padding: "12px 18px", fontFamily: FONT, fontSize: 14 }}>Download my report (coming soon)</button>
+        <button onClick={download} disabled={state === "loading"} style={{ alignSelf: "flex-start", background: C.ink, color: "#FFFFFF", border: "none", borderRadius: 22, padding: "12px 18px", fontFamily: FONT, fontSize: 14, cursor: "pointer" }}>{state === "loading" ? "Getting your report…" : "Download my report (PDF)"}</button>
+        {state === "missing" && <span style={{ fontSize: 12, color: C.sub }}>Your report isn't available here yet. Please reach out to your PeopleGro facilitator.</span>}
       </div>
       <div style={card()}>
         <b style={{ fontSize: 15 }}>Your summary</b>
@@ -861,7 +870,7 @@ export default function App() {
         {tab === "Profile" && <ProfileTab sc={sc} a={a} goTap={goTap} />}
         {tab === "Working With" && <WorkingWithTab a={a} view={wwView} setView={setWwView} />}
         {tab === "Practice" && <PracticeTab />}
-        {tab === "Reports" && <ReportsTab a={a} />}
+        {tab === "Reports" && <ReportsTab a={a} email={email} />}
         {tab === "Resources" && <ResourcesTab />}
       </div>
       {footer}
