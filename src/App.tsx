@@ -690,23 +690,29 @@ function PracticeTab() {
 // Reports and Resources
 // ---------------------------------------------------------------------------
 function ReportsTab({ a, email }: any) {
-  const [state, setState] = useState<"idle" | "loading" | "missing">("idle");
-  const download = async () => {
-    setState("loading");
-    const { data, error } = await supabase.storage.from("reports").createSignedUrl(email + ".pdf", 120);
-    if (error || !data?.signedUrl) { setState("missing"); return; }
-    setState("idle");
+  const [state, setState] = useState<Record<string, "idle" | "loading" | "missing">>({});
+  const download = async (kind: string) => {
+    setState(st => ({ ...st, [kind]: "loading" }));
+    const { data, error } = await supabase.storage.from("reports").createSignedUrl(email + "-" + kind + ".pdf", 120);
+    if (error || !data?.signedUrl) { setState(st => ({ ...st, [kind]: "missing" })); return; }
+    setState(st => ({ ...st, [kind]: "idle" }));
     window.open(data.signedUrl, "_blank", "noopener");
   };
+  const reports: [string, string, string][] = [
+    ["individual", "Your I-OPT Individual Analysis Report", "Your full I-OPT report from PCI, the one PeopleGro walked you through in your session."],
+    ["change", "Your Change Management Report", "How your processing style shows up in change, from PCI."],
+  ];
   return (
     <div style={col(14)}>
       <b style={{ fontSize: 20, color: C.ink }}>Reports</b>
-      <div style={{ border: "2px solid " + C.line, borderRadius: 16, padding: 18, ...col(10) }}>
-        <b style={{ fontSize: 16 }}>Your I-OPT Individual Report</b>
-        <span style={{ fontSize: 13, lineHeight: 1.55, color: C.sub }}>The full report from your session, the same one PeopleGro walked you through.</span>
-        <button onClick={download} disabled={state === "loading"} style={{ alignSelf: "flex-start", background: C.ink, color: "#FFFFFF", border: "none", borderRadius: 22, padding: "12px 18px", fontFamily: FONT, fontSize: 14, cursor: "pointer" }}>{state === "loading" ? "Getting your report…" : "Download my report (PDF)"}</button>
-        {state === "missing" && <span style={{ fontSize: 12, color: C.sub }}>Your report isn't available here yet. Please reach out to your PeopleGro facilitator.</span>}
-      </div>
+      {reports.map(([kind, title, desc]) => (
+        <div key={kind} style={{ border: "2px solid " + C.line, borderRadius: 16, padding: 18, ...col(10) }}>
+          <b style={{ fontSize: 16 }}>{title}</b>
+          <span style={{ fontSize: 13, lineHeight: 1.55, color: C.sub }}>{desc}</span>
+          <button onClick={() => download(kind)} disabled={state[kind] === "loading"} style={{ alignSelf: "flex-start", background: C.ink, color: "#FFFFFF", border: "none", borderRadius: 22, padding: "12px 18px", fontFamily: FONT, fontSize: 14, cursor: "pointer" }}>{state[kind] === "loading" ? "Getting your report…" : "Download PDF"}</button>
+          {state[kind] === "missing" && <span style={{ fontSize: 12, color: C.sub }}>This report isn't available here yet. Please reach out to your PeopleGro facilitator.</span>}
+        </div>
+      ))}
       <div style={card()}>
         <b style={{ fontSize: 15 }}>Your summary</b>
         <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Preferred style:</b> {a.isBal ? "No single preferred style" : a.top + ", " + STY[a.top as Code].name}</span>
