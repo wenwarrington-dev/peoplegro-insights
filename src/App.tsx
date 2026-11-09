@@ -1,670 +1,768 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { supabase, supabaseConfigured, IoptRow } from "./supabase";
 
-// Calls the server-side Coach endpoint (api/coach.js). The Claude API key never reaches the browser.
-async function askClaude(messages: { role: string; content: string }[], mode: "coach" | "report" = "coach"): Promise<string> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  const res = await fetch("/api/coach", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + (token || "") },
-    body: JSON.stringify({ mode, messages }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || "Something went wrong. Try again.");
-  return json.text || "";
-}
-
-const G = {
-  green: "#578B38", greenDark: "#3D6425", greenPale: "#EDF4E6",
-  greenBorder: "#C4DFB0", red: "#B01B43", charcoal: "#455048",
-  charcoalLight: "#6B7B6E", offWhite: "#F8FAF6", border: "#DDE8D8",
+// ---------------------------------------------------------------------------
+// Look and feel
+// ---------------------------------------------------------------------------
+const C = {
+  brand: "#3D6425", brandLight: "#578B38", ink: "#2B2B2B", text: "#2F3A32", sub: "#45524A", muted: "#56645A",
+  line: "#DDE8D8", soft: "#F8FAF6", neutral: "#F1F2F1", pillLine: "#9AA39C", page: "#EEF3EA",
 };
+const FONT = "Georgia, 'Times New Roman', serif";
 
-const STYLES: any = {
+type Code = "RS" | "LP" | "RI" | "HA";
+const ORDER: Code[] = ["RS", "LP", "RI", "HA"];
+
+// ---------------------------------------------------------------------------
+// Content (matches PeopleGro Insights Copy Draft v1)
+// ---------------------------------------------------------------------------
+const STY: Record<Code, any> = {
   RS: {
-    label: "Reactive Stimulator", color: "#C2410C", light: "#FFF7ED", border: "#FED7AA",
-    motto: "He who hesitates is lost!", emoji: "⚡",
-    gift: "Keeps things moving and helps teams get unstuck",
-    focus: "Quick action and forward movement",
-    description: "Acts with minimal information, highly adaptable. Moves A→E→B→Z — associative, inductive thinking.",
-    strengths: "Speed, decisiveness, adaptability, momentum, getting things started",
-    challenges: "May skip details, struggle with follow-through, can create chaos",
-    motivators: "Autonomy, fast feedback, variety, short bursts, freedom to act",
-    commTips: ["Concentrate on major points — give details only on request","Focus on near-term action — give logic only if required","Pace delivery rapidly — use short and intense bursts","Motivate with emotion — be demonstrative, use emphasis","Hold brief, frequent sessions — RS tend to bore easily","Do not expect long retention","Tell what is wanted — expect fast action"],
-    leaderStyle: "Catalytic — sparks energy, creates urgency, pushes teams into action",
-    snowflake: ["Opportunity Oriented","High Intensity","Volatility Tolerant","Flexible Focus","Short Range Horizon","Decisive","Fast Execution","Rapid Response","Action Oriented"],
-    cultural: ["Assertive & Confident","Short-Term Future","Fast Impulsive Decisions","Uncertainty Tolerant","Tangible Outcome = Success","Individualism","Trust Quickly Given"],
+    name: "Reactive Stimulator", color: "#166534", light: "#F0FDF4", border: "#86EFAC", q: "When?", share: 15,
+    key: "Forward movement, even with little information", motto: "He who hesitates is lost",
+    desc: "When you're working from your RS preferred style, you move first and adjust as you go. You take in information in a loose, jump-around way and turn it into action quickly. Waiting feels riskier to you than acting.",
+    bring: "Speed, decisiveness, adaptability, and energy to get a stuck team moving", watch: "Skipping details, moving on before others are ready", motivates: "Freedom to act, variety, fast feedback", gift: "You keep things moving and get teams unstuck",
+    Time: "Now. Fast pace.", Detail: "Minimal, given or received", Risk: "What risk? There's always an adjustment.",
+    traits: ["Opportunity Oriented", "High Intensity", "Volatility Tolerant", "Flexible Focus", "Short Range Horizon", "Decisive", "Fast Execution", "Action Oriented"],
+    good: "Passionate, competitive, confident, intuitive, forceful, spirited, daring, eager, bold", bad: "Insensitive, combative, impulsive, abrasive, inexact, volatile, pushy, blunt",
+    changeLook: "Shortcuts, practical solutions, and quick results", changeBring: "You adopt change early and thrive in the volatility",
+    stress: "Push hard to do something, anything, to get unstuck", trigger: "No clear way forward",
+    listen: "You may start planning your response while the other person is still talking, and miss what comes at the end.", listenTry: "Questions like \"What would forward movement look like?\" or \"What is the timeline?\" can help you stay with the speaker.",
+    when: "Things feel stuck, a decision keeps getting pushed back, or the team is waiting for perfect information.", looks: "You might choose one next step you could take today, or set a short deadline. Some people find it helps to decide with what they know now and plan to adjust. What would fit this situation?",
+    words: "forward movement, success, achievement",
+    tips: ["Short, bulleted emails about one thing", "Being clear about whether you want action or a sounding board", "The main point first, with details if they ask", "Energy. Tone and gestures matter", "Short, frequent meetings"],
+    strong: "You keep pushing to do something, even when more action is making things worse.",
+    snowS: ["Focuses on improvement in speed or volume", "Recovers quickly from any missteps", "Early adopter of change initiatives", "Thrives in the volatility of change", "Energetic and outgoing", "Readily accepts change", "Quickly offers ideas", "Agile"],
+    snowC: ["May move to action before change is understood", "May have difficulty relating to long-term vision", "Resists change that introduces complexity", "Tendency to leave projects unfinished", "Resists added detail", "Risk is inherent and inevitable in change"],
   },
   LP: {
-    label: "Logical Processor", color: "#1D4ED8", light: "#EFF6FF", border: "#BFDBFE",
-    motto: "Do it once, do it right!", emoji: "🔬",
-    gift: "Ensures quality, consistency, and operational excellence",
-    focus: "Structure, planning, and operationalizing tasks",
-    description: "Detail-oriented, low risk tolerance, sequential execution. Moves A→B→C→D — structured, deductive logic.",
-    strengths: "Precision, thoroughness, critical thinking, quality control, reliable systems",
-    challenges: "May over-analyze, slow to decide under pressure, can seem detached",
-    motivators: "Accuracy, clear expectations, time to process, evidence-based decisions",
-    commTips: ["Be logical, internally consistent — be unemotional in delivery","Expect skepticism — offset with visible integrity","Use extensive operational details — what is and will happen","Justify changes — show HOW things will be better","Hold long intensive sessions — LP do not bore easily","Prepare for challenges — expect to be tested","Expect change to take time — LP like to be sure"],
-    leaderStyle: "Methodical — sets high standards, builds reliable systems, holds the quality bar",
-    snowflake: ["Analytically Oriented","High Certainty of Outcome","Contemplative","High Rule/Norm Compliance","Hesitantly Decisive","Comprehensive Planning","High Conceptual Detail","Project Level Horizon"],
-    cultural: ["Thoughtful & Reflective","Strategic Horizon","Logic-Based Decisions","Uncertainty Intolerant","Complete Understanding = Success","Tradition Respected","Trust via Intellectual Consistency"],
+    name: "Logical Processor", color: "#1D4ED8", light: "#EFF6FF", border: "#BFDBFE", q: "How?", share: 30,
+    key: "Certainty of outcome, knowing how it will work before you act", motto: "Do it once, do it right",
+    desc: "When you're working from your LP preferred style, you want to do it once and do it right. You take in information step by step and act on it in a planned, orderly way. Once you've mastered a process, you're the most efficient person in the room.",
+    bring: "Precision, thoroughness, quality, reliable processes", watch: "Judging new ideas before they mature, holding tightly to procedures", motivates: "Clear expectations, accuracy, predictability", gift: "You build quality, consistent processes",
+    Time: "Take the time to do it right", Detail: "All operational detail matters", Risk: "Low tolerance",
+    traits: ["Analytically Oriented", "High Certainty of Outcome", "Contemplative", "High Rule/Norm Compliance", "Hesitantly Decisive", "Comprehensive Planning", "High Conceptual Detail", "Project Level Horizon"],
+    good: "Conscientious, trustworthy, committed, composed, restrained, resolute, focused, devoted", bad: "Judgmental, hardhearted, mechanical, secretive, stubborn, inflexible, plodding, distant",
+    changeLook: "New directions, processes, and methods, which you then follow exactly", changeBring: "You spot operational risk and make the change work day to day",
+    stress: "Hold tightly to the known process and want everything in writing", trigger: "Uncertainty or pressure to skip steps",
+    listen: "You're quick to spot gaps in logic, and new ideas always have gaps early on.", listenTry: "Giving an idea time to mature, or offering a small test, before judging it.",
+    when: "Good ideas keep stalling before they're finished, or work keeps getting redone.", looks: "You might write out the steps in order, or set a finish date. Some people find it helps to ask how it will work, or to test it small first. What would fit this situation?",
+    words: "certainty of outcome, planning, logical, beta test",
+    tips: ["Logic, consistency, and a matter-of-fact delivery", "Patience with skepticism. Trust is earned through consistency", "Plenty of operational detail", "Showing HOW a change makes things better", "Time for change to settle in"],
+    strong: "You hold tighter to the process, procedure, or task, even when it isn't getting the results you want.",
+    snowS: ["Sustained effort through the entire change", "Readily accepts incremental change", "Helps identify operational risk exposures", "Tests new ideas thoroughly", "Operationalizes change", "Deliberate", "Careful", "Precise"],
+    snowC: ["Resistant to completely new approaches", "Adopts change initiatives slowly (where's the proof?)", "“Visions” are viewed as “dreams”", "“Suffers in silence”", "Skeptical", "Anxious"],
   },
   RI: {
-    label: "Relational Innovator", color: "#047857", light: "#ECFDF5", border: "#A7F3D0",
-    motto: "There is always a better way!", emoji: "🌱",
-    gift: "Generates unique ideas and fosters creative solutions",
-    focus: "Innovation and finding better ways through people",
-    description: "Big-picture, optimistic, comfortable with ambiguity. Always reconsidering — I'll do this, no that, no this other thing.",
-    strengths: "Innovation, creative collaboration, optimism, fresh perspectives, mission-driven",
-    challenges: "May avoid hard decisions, constantly pivoting, struggles with follow-through",
-    motivators: "Inclusion, recognition, big ideas, feeling heard, finding a better way",
-    commTips: ["Concentrate on major points — give details only on request","Outline major concepts — service, innovation, impact","Pace delivery rapidly — use short and intense bursts","Motivate with emotion — be demonstrative, use emphasis","Explain the what and why of change — less on HOW","Use analogies and comparisons extensively","Condense and focus — RI do not have long attention spans","Expect new ideas — be flexible/adaptive"],
-    leaderStyle: "Nurturing & Innovative — builds loyalty, creates safety, always seeking a better way",
-    snowflake: ["Innovation Focused","Rapid Idea Generation","Flexible Planning","Mission Oriented","Variable Intensity","Optimistic","Comfortable with Ambiguity"],
-    cultural: ["Assertive & Confident","Creative Decisions","People Sensitivity","Cooperative Achievement","Innovation = Success","Trust through Relationship","Team Oriented"],
+    name: "Relational Innovator", color: "#A16207", light: "#FEFCE8", border: "#FDE68A", q: "What?", share: 22,
+    key: "Finding the gap, and a better way that serves the mission", motto: "There is always a better way",
+    desc: "When you're working from your RI preferred style, you look for the gap and the better way, and it has to connect to the mission. You make connections between things that seem unrelated, then think them through before acting.",
+    bring: "Fresh thinking, vision, optimism, imagining possible futures", watch: "Following new ideas before finishing the current one", motivates: "Meaningful work, big ideas, feeling heard", gift: "You find gaps and push people further than they thought possible",
+    Time: "Fluid. It varies.", Detail: "Matters when invested, otherwise tuned out", Risk: "Very optimistic",
+    traits: ["Innovation Focused", "Rapid Idea Generation", "Flexible Planning", "Mission Oriented", "Variable Intensity", "Optimistic", "Comfortable with Ambiguity"],
+    good: "Ingenious, forthright, engaging, inspired, flexible, positive, daring, clever", bad: "Absent-minded, undependable, unfocused, inattentive, capricious, inefficient, excitable, dreamer",
+    changeLook: "Fluid, fast-moving situations that need creative solutions", changeBring: "You keep the mission in view and encourage change of all kinds",
+    stress: "Freeze, with too many options and no clear best one", trigger: "No better way to be found, or a gap you have no authority to fix",
+    listen: "Your mind starts connecting what you hear to other ideas, and you can miss important details.", listenTry: "A clarifying question before moving to a new idea can help you catch what you might miss.",
+    when: "The usual approach has stopped working, or the team feels stuck defending how things have always been done.", looks: "You might ask what if, or look for the gap nobody is talking about. Some people find it helps to come up with a few options before choosing one. What would fit this situation?",
+    words: "sustainability, collaboration, practical innovation, explore alternatives",
+    tips: ["A clear connection to the mission", "The what and why, with less time on the how", "Comparisons and analogies", "When the answer is no, framing it as timing or readiness", "Flexibility. Changes and new versions are part of the process"],
+    strong: "You keep searching for the better way. When there isn't one, you can end up in a holding pattern, with lots of options and no movement.",
+    snowS: ["Ideas contain new and exciting methods", "Takes a long-range view of major issues", "Thinks in terms of overall mission", "Encourages changes of all types", "Focus on substantive improvements", "Open and expressive", "Readily cooperates", "Creative"],
+    snowC: ["Unwilling to give up control over approach", "Lack of detail focus can create exposures", "Attention diverted by even newer ideas", "Resists “tried and true” methods", "Candid in negative judgments", "Risk is inherent and inevitable in change"],
   },
   HA: {
-    label: "Hypothetical Analyzer", color: "#B01B43", light: "#FCEEF3", border: "#F4B8C8",
-    motto: "Think!! Then act.", emoji: "🔭",
-    gift: "Holds complex systems in mind and excels in systemic thinking",
-    focus: "Complete, reasoned understanding before action",
-    description: "Data-driven, asks why, comprehensive analysis. Ponders goals, projections, options, org structures simultaneously.",
-    strengths: "Long-term strategy, connecting dots, reframing problems, systemic thinking",
-    challenges: "Analysis paralysis, hard to pin down, loses interest in execution",
-    motivators: "Big ideas, intellectual challenge, freedom to explore, the why behind everything",
-    commTips: ["Use consistent presentation — be unemotional in delivery","Outline long-term consequences — even for short-term ideas","Provide a big picture framework — show how it fits in","Expect skepticism — offset with visible integrity","Justify changes — show WHY things will be better","Explain all options considered — miss nothing","Hold long intensive sessions — HA do not bore easily","Expect change to take time — HA like to be sure"],
-    leaderStyle: "Visionary — inspires with ideas, challenges the status quo, sees around corners",
-    snowflake: ["Analytically Oriented","High Certainty of Outcome","Contemplative","High Rule/Norm Compliance","Comprehensive Planning","Long-Term Horizon","Systemic Thinking","High Conceptual Clarity"],
-    cultural: ["Thoughtful & Reflective","Strategic Horizon","Logic-Based Decisions","Uncertainty Intolerant","Complete Understanding = Success","Tradition Respected","Trust via Intellectual Consistency","Conceptual Perfection"],
+    name: "Hypothetical Analyzer", color: "#DC2626", light: "#FEF2F2", border: "#FCA5A5", q: "Why?", share: 33,
+    key: "Complete, reasoned understanding, with a logic path you can explain", motto: "Think, then act",
+    desc: "When you're working from your HA preferred style, you think, then act. You take in all the information, sort what's valid from what isn't, and build a full picture before you move.",
+    bring: "Systems thinking, long-term strategy, contingency planning", watch: "Overanalyzing, treating every risk as equally likely", motivates: "Intellectual challenge, understanding the why", gift: "You can hold a whole system in mind",
+    Time: "Understanding takes time", Detail: "All data is good, so it can be sorted", Risk: "Calculate and understand it first",
+    traits: ["Analytically Oriented", "High Certainty of Outcome", "Contemplative", "High Rule/Norm Compliance", "Comprehensive Planning", "Long-Term Horizon", "Systemic Thinking", "High Conceptual Clarity"],
+    good: "Calm, astute, patient, attentive, insightful, intelligent, agreeable, supportive", bad: "Slow, timid, trifling, tortuous, compliant, indecisive, convoluted, longwinded",
+    changeLook: "Time to examine every possible contingency", changeBring: "You see how the change fits the whole system",
+    stress: "Become frustrated and keep raising the same concerns", trigger: "Others brushing off risks you've identified",
+    listen: "You're a naturally good listener, and you can get pulled toward the most interesting part and miss the rest.", listenTry: "Staying with the speaker through the less interesting parts, and asking for time to process if you need it.",
+    when: "Things are moving fast and keep breaking, or a decision will affect a lot of people or systems.", looks: "You might step back and ask why, or map who and what this touches. Some people find it helps to list the risks and what they would do about each. What would fit this situation?",
+    words: "systems, risk assessment, contingency planning, complete understanding",
+    tips: ["The big picture first", "A walk-through of how you got there, including options ruled out", "Showing WHY a change makes things better", "Openness to questions. They're testing the logic, not you", "Saying how much detail you need when you ask"],
+    strong: "You keep analyzing and raising risks, even after you have enough to decide.",
+    snowS: ["Identifier of systems risk", "Thinks systemically", "Focus on the “big picture”", "Complete understanding of change", "Knows how the change “fits in”", "Examines all possible contingencies", "Readily accepts change at a measured pace", "Expert-level knowledge of the change effects"],
+    snowC: ["Skeptical", "Overly analytical", "Moves to action reluctantly", "Unlikely to fully buy in to visions", "Frustrated by fast-moving changes", "Less committed to actual implementation"],
   },
 };
 
-const PATTERNS: any = {
-  Performer: { styles: ["RS","LP"], color: "#9A3412", desc: "Task-specific, action oriented, focused on tangible achievement. Takes short-range perspective and makes quick, reliable decisions." },
-  Conservator: { styles: ["LP","HA"], color: "#1E40AF", desc: "Careful, detail-oriented, skeptical of new situations. Long preparation and careful execution result in consistent quality output." },
-  Perfector: { styles: ["HA","RI"], color: "#B01B43", desc: "Generates and values new ideas, but expresses them only after exhaustive consideration of risk and reward. Often found in great advisors." },
-  Changer: { styles: ["RI","RS"], color: "#065F46", desc: "Generates new ideas quickly and begins implementing immediately. Experimental strategy, averse to detail, rapid and innovative." },
+const PAT: Record<string, string> = { "RI+RS": "Changer", "RS+RI": "Changer", "RS+LP": "Performer", "LP+RS": "Performer", "LP+HA": "Conservator", "HA+LP": "Conservator", "HA+RI": "Perfector", "RI+HA": "Perfector" };
+const OPP: Record<Code, Code> = { RS: "HA", HA: "RS", RI: "LP", LP: "RI" };
+const PCHANGE: Record<string, string> = {
+  Changer: "You measure success by the overall change, and turn a stream of ideas into action.",
+  Performer: "You tend to accept change and are eager to show results.",
+  Conservator: "Focusing on the short-term goals of the change can help reduce your discomfort.",
+  Perfector: "You work on turning raw ideas into finished concepts.",
 };
 
-const RESOURCES = [
-  { type:"video", title:"Introduction to I-OPT", desc:"PeopleGro foundational overview of the I-OPT framework.", style:"ALL", cat:"Getting Started", url:"http://www.iopt.com/coffee-break-videos.html", dur:"12 min", star:true },
-  { type:"video", title:"Team Dynamics & I-OPT", desc:"How to read your team's collective processing style and engineer better collaboration.", style:"ALL", cat:"Team & Leadership", url:"http://www.iopt.com/coffee-break-videos.html", dur:"15 min", star:true },
-  { type:"video", title:"The RS in Action", desc:"Understanding the Reactive Stimulator — how they process and what they need.", style:"RS", cat:"Style Deep Dives", url:"http://www.iopt.com/coffee-break-videos.html", dur:"8 min", star:false },
-  { type:"video", title:"The LP in Action", desc:"Understanding the Logical Processor — structure, detail, and precision.", style:"LP", cat:"Style Deep Dives", url:"http://www.iopt.com/coffee-break-videos.html", dur:"8 min", star:false },
-  { type:"video", title:"The RI in Action", desc:"Understanding the Relational Innovator — innovation, people, and possibility.", style:"RI", cat:"Style Deep Dives", url:"http://www.iopt.com/coffee-break-videos.html", dur:"8 min", star:false },
-  { type:"video", title:"The HA in Action", desc:"Understanding the Hypothetical Analyzer — systemic thinking and completeness.", style:"HA", cat:"Style Deep Dives", url:"http://www.iopt.com/coffee-break-videos.html", dur:"8 min", star:false },
-  { type:"pdf", title:"Getting Your Way — Communication Strategies", desc:"The official I-OPT Strategic Style Communication guide. Essential reading.", style:"ALL", cat:"Getting Started", url:"#", dur:"", star:true },
-  { type:"pdf", title:"I-OPT Snowflake — Behavioral Characteristics", desc:"Selected characteristics of all four strategic styles. Your quick-reference guide.", style:"ALL", cat:"Getting Started", url:"#", dur:"", star:false },
-  { type:"pdf", title:"Strategic Patterns Summary", desc:"Performer, Conservator, Perfector, Changer — the four combined patterns explained.", style:"ALL", cat:"Team & Leadership", url:"#", dur:"", star:false },
-  { type:"article", title:"Why Teams Spend 16 Hours a Week Miscommunicating", desc:"The $18K cost of non-productive conflict and how I-OPT closes the gap.", style:"ALL", cat:"Team & Leadership", url:"#", dur:"", star:true },
-  { type:"article", title:"The PeopleGro Model: How Matters", desc:"Self-awareness and self-management as the foundation of all performance.", style:"ALL", cat:"Getting Started", url:"#", dur:"", star:false },
-  { type:"article", title:"Embracing Friction: A New Way to Think About Conflict", desc:"The objective is not to eliminate friction but to embrace and manage it.", style:"ALL", cat:"Team & Leadership", url:"#", dur:"", star:false },
-  { type:"link", title:"I-OPT Official Website", desc:"Home of Organizational Engineering by Professional Communications Inc.", style:"ALL", cat:"Getting Started", url:"http://www.iopt.com", dur:"", star:false },
-  { type:"link", title:"I-OPT Coffee Break Videos", desc:"Short video series covering all aspects of the I-OPT framework.", style:"ALL", cat:"Getting Started", url:"http://www.iopt.com/coffee-break-videos.html", dur:"", star:false },
+const PATTERNS = [
+  { name: "Changer", combo: "RI + RS", share: 21, desc: "Comes up with new ideas and starts acting on them quickly. Creative, agile, optimistic.", watch: "Moving faster than the team can follow." },
+  { name: "Performer", combo: "RS + LP", share: 14, desc: "Focused on the task and the result. Quick, reliable decisions.", watch: "Trading long-term thinking for immediate results." },
+  { name: "Conservator", combo: "LP + HA", share: 46, desc: "Careful, detailed, and skeptical of new situations. Consistent, quality work.", watch: "Resisting change even when it's needed." },
+  { name: "Perfector", combo: "HA + RI", share: 19, desc: "Values new ideas but shares them after thinking through risk and reward.", watch: "Taking a long time to reach a conclusion." },
+];
+const PATTERN_TIPS = [
+  { name: "Changer", combo: "RI + RS", tip: "Energy and the big idea, then help choosing what to act on first." },
+  { name: "Performer", combo: "RS + LP", tip: "Clarity about the task, the result, and the deadline." },
+  { name: "Conservator", combo: "LP + HA", tip: "Time, detail, and evidence, and seeing that the risks were considered." },
+  { name: "Perfector", combo: "HA + RI", tip: "Hearing the idea early, with room to think it through." },
+];
+const PAIRS: [string, string][] = [
+  ["RS + LP", "Good working relationship. RS can frustrate LP by acting without a plan. LP can frustrate RS by being slow."],
+  ["RS + HA", "Can work very well. HA helps with goals and options, RS makes ideas real."],
+  ["RS + RI", "Lots of energy and ideas. May need an LP or HA to add structure."],
+  ["LP + HA", "Natural fit. HA plans and assesses, LP executes."],
+  ["LP + RI", "Can work well with effort. RI's constant new ideas can feel threatening to LP."],
+  ["HA + RI", "Very good fit when both understand the dynamic. May need an RS or LP to get to action."],
+  ["RS + RS", "Fast and energized, but both may push their own direction. Agree on what moving forward means."],
+  ["LP + LP", "Friction can come from each protecting their own process."],
+  ["RI + RI", "Can turn into a better-idea competition. You may not see the mission the same way."],
+  ["HA + HA", "Each has their own vetted information. Common ground on the facts can help."],
+];
+const TO: Record<Code, Record<Code, string>> = {
+  RS: { RS: "It can help to agree on what moving forward means right now.", LP: "It can help to be specific and logical, and show how it fits what they already trust.", HA: "Questions are likely. It can help to show your thought path and the big picture.", RI: "It can help to keep it focused, use analogies, and connect it to the mission." },
+  LP: { RS: "It can help to keep it short and action-focused, with some energy.", HA: "Challenge is likely, and it isn't about your competence. It can help to show the big picture.", RI: "It can help to connect it to the mission and use analogies, and to be ready for deep dives.", LP: "It can help to respect each other's structure and look for common ground." },
+  RI: { RS: "It can help to lead with energy and the action, and keep it short and prioritized.", LP: "It can help to slow down, give more detail than feels natural, and walk through your logic.", HA: "It can help to lay out your reasoning and the big picture, and give them time to think.", RI: "It can help to skip the better-idea competition and give them something to react to." },
+  HA: { RS: "It can help to cover the essentials quickly and build some enthusiasm.", LP: "It can help to be clear and logical, and tie new information to how the work gets done.", RI: "It can help to keep it focused and use comparisons.", HA: "It can help to explain your logic path and look for common ground on the facts." },
+};
+const DEES = [
+  { name: "Disengagement", looks: "Hard to find, doing only the basics, no questions", hear: "\"I don't care.\" \"Whatever you want.\"", helps: "Making the first move, creating safety, asking questions, and listening." },
+  { name: "Disidentification", looks: "Dwelling on the past, sticking with the old team", hear: "\"It wasn't broken, why change it?\" \"I used to...\"", helps: "Exploring what mattered most before, and what the change might offer." },
+  { name: "Disorientation", looks: "Endless questions, frozen by fear of doing it wrong, very busy", hear: "\"Not sure where to start.\"", helps: "A big-picture framework and a plan with clear priorities." },
+  { name: "Disenchantment", looks: "Raised voice, walking out, malicious compliance", hear: "\"I can't believe this is happening.\"", helps: "Recognizing that anger often masks another D, and room to vent respectfully. Acknowledging isn't agreeing." },
+];
+const ASSESS: [string, string][] = [
+  ["I already miss the old days", "The future is bright"], ["I feel unsure, or even stuck", "I know what to do"], ["A loss", "A gain"],
+  ["Chaotic", "Manageable"], ["Separate from change", "Involved with change"], ["Confused", "Clear"], ["Powerless", "Empowered"],
+  ["Afraid to make mistakes", "Growth opportunity"], ["Punished", "Rewarded"], ["Been doing it wrong", "Evolving"],
+];
+const LEVELS = [
+  ["Point of view", "Hearing emotion and logic, with compassion, to understand their world"],
+  ["Emotion", "Hearing the emotions driving their reasoning"],
+  ["Logic", "Following their internal logic"],
+  ["Rebuttal", "Focused on your response, getting ready to argue"],
+  ["Gist", "Tuning in and out, checking it against your own logic"],
+];
+const STUCK: [string, string][] = [
+  ["All or nothing", "What's beyond the black and white I'm seeing? Is there an \"and\" instead of an \"or\"?"],
+  ["Overgeneralizing", "Am I projecting one past event onto this situation?"],
+  ["Emotional filtering", "Am I seeing only the positives or only the negatives?"],
+  ["Downplaying the positive", "Am I brushing off real compliments?"],
+  ["Jumping to conclusions", "Am I mind reading with no evidence? What don't I know?"],
+  ["Magnifying or minimizing", "Am I blowing this out of proportion, or downplaying something that matters?"],
+  ["Storytelling as truth", "What story am I telling myself? Can I trade up for a better story?"],
+  ["Critical statements", "Am I using should, must, have to, or can't?"],
+  ["I am what I think", "Am I reasoning from a feeling?"],
+  ["Labeling", "Am I labeling myself or others based on a mistake?"],
+  ["Blaming", "Am I blaming myself for more than my share, or missing my part?"],
+  ["Unspoken expectations", "How would they know what I wanted?"],
+  ["Processing style", "Are different, or similar, processing styles at play?"],
+  ["Us vs. them", "Am I seeing this as us vs. them, right vs. wrong, or win vs. lose?"],
 ];
 
-const REPORT_TYPES = [
-  { id:"individual", label:"Individual Profile", icon:"👤", scope:"individual" },
-  { id:"sales", label:"Sales Style", icon:"💼", scope:"individual" },
-  { id:"change", label:"Change Mgmt", icon:"🔄", scope:"individual" },
-  { id:"twoperson", label:"TwoPerson™", icon:"🤝", scope:"team" },
-  { id:"team", label:"TeamAnalysis™", icon:"🏢", scope:"team" },
-  { id:"leader", label:"LeaderAnalysis™", icon:"🎯", scope:"team" },
+type Res = { id: string; t: string; kind: string; d: string; imgs?: { src: string; alt: string }[]; videos?: { id: string; title: string; note?: string }[]; paras?: string[]; list?: string[]; after?: string[]; links?: { href: string; text: string }[] };
+const RESOURCES: Res[] = [
+  { id: "model", t: "The PeopleGro Model", kind: "Guide", d: "Three buckets for satisfaction and success, and the lotus that ties them together.",
+    imgs: [{ src: "/images/model-buckets.png", alt: "The PeopleGro Model: self-management, results and productivity, and technical and operational, leading to satisfaction and success" }, { src: "/images/model-lotus.png", alt: "The integrated PeopleGro Model as a lotus, with self-awareness and self-management at the center" }],
+    paras: ["The PeopleGro Model works in every part of life: at work, at home, and as a volunteer. You define what satisfaction and success mean for you. No one else should define that for you.", "There are three buckets. Two are about what we do, and one is about how we do it."],
+    list: ["Technical and operational (what): your knowledge, experience, skills, talents, and education. You own this. You don't turn in your brain with your badge.", "Results and productivity (what): what you want to accomplish for yourself, your family, or your organization.", "Self-awareness and self-management (how): how we work together to get there. Working together is the hardest thing we do as human beings."],
+    after: ["In the integrated model, self-awareness and self-management are the center petal of a lotus, because the how elevates both what buckets. The lotus grows out of the muck and blooms above the water, a strong metaphor for people and organizations."] },
+  { id: "protocols", t: "The Interaction Protocols", kind: "Video", d: "How we agree to be together and work together.",
+    videos: [{ id: "289925773", title: "Interaction Protocols: What Are They and Why Use Them" }],
+    paras: ["PeopleGro developed these over years of working with clients. They set the tone for how people work together. There are five protocols in two groups."],
+    list: ["We agree: Individual intent is not being questioned. We don't know each other's stories, and we're all doing the best we can in this moment.", "We agree: To practice self-awareness and self-management. Not perfection, just paying attention and adjusting as needed.", "We agree: To stay in the conversation and support each other. Skeptical is OK. Cynical is not. You don't have to agree, but you strive to understand.", "We give permission: To speak as openly and directly as you are able to in the moment. Thinking out loud is messy, and it builds shared understanding.", "We give permission: To stumble, to not be your best, and to learn together. Learning isn't mastery, and it isn't always linear. Allow space and grace."],
+    after: ["PeopleGro opens sessions by reading these out loud and asking everyone for a thumbs up. You might try the same with your own team."] },
+  { id: "responsible", t: "Who's Responsible for Communication?", kind: "Video", d: "Why each of us is 100% responsible for four things in every conversation.",
+    videos: [{ id: "289915324", title: "Who's Responsible for Communication?", note: "Testing version. An updated video is coming." }],
+    paras: ["In a conversation between two people, who is responsible for what? Many people say 50/50. PeopleGro's answer: each of us is 100% responsible for four things."],
+    list: ["Your content: the words you say", "Your nonverbals: body language, facial expressions, tone of voice, and whether they line up", "Your reaction or response to the other person", "Paying attention to the other person's feedback"],
+    after: ["The one thing we're not responsible for is how our words land on the other person's ear. That's why their feedback matters so much. Some days 100% is aspirational, and that's OK. It's a muscle that grows with practice."] },
+  { id: "sasm", t: "Self-Awareness and Self-Management", kind: "Guide", d: "The two primary tenets of emotional intelligence, and the heart of the PeopleGro Model.",
+    paras: ["Self-awareness is our ability to recognize our automatic behaviors and responses, our triggers, our stories, our mental models, and our assumptions.", "Self-management is our ability to make a plan and practice doing something differently, based on that self-awareness.", "The bridge between them is reflection: noticing whether something helps us or undermines us, and then choosing what to practice. It's a personal journey done in a social context. We need each other for mirroring, feedback, and support."],
+    after: ["Nicole's own example: loud voices hit her nervous system hard. Over time, she built a practice of scanning the room and asking herself, \"Am I OK? Are we OK?\" Then she chooses how to respond. Her questions may not fit everyone, and that's the point. Everyone's practice is their own."] },
+  { id: "commodel", t: "The Basic Communication Model", kind: "Guide", d: "Input, process, output, and why we judge what we see.",
+    imgs: [{ src: "/images/communication-model.png", alt: "Input, process, and output flow into processing preferences (I-OPT), which lead to behaviors" }],
+    paras: ["We take in information, process it, and act on it, all at the same time, all the time. So does everyone else. Together, these create our processing preferences, our I-OPT profile, and our behavior mirrors them.", "Only output is visible to others, and output is behavior. What do we do with each other's output? We judge it. Judging keeps us safe, so we don't want to stop. The challenge is that the brain goes for the lowest-level judgments.", "The antidote is to get curious and act like a kindergartner: play, ask questions, and see learning as play. Curiosity isn't inherited. It's a skill that grows with practice."] },
+  { id: "loop", t: "The Feedback Loop", kind: "Guide", d: "Behavior, emotions, feelings, and trading up for a better story.",
+    imgs: [{ src: "/images/feedback-loop.png", alt: "The feedback loop: processing styles shape behavior, which leads to emotions, which we interpret as feelings" }],
+    paras: ["Behavior is what others see. When we experience someone's behavior, we have a biochemical reaction, an emotion. Then we interpret that emotion, and that interpretation is a feeling: the story we tell ourselves.", "We think we're interpreting the other person's behavior. We're actually interpreting our own emotions. That's the high-leverage point. Our stories can make a reaction stronger and longer, or settle it quickly."],
+    after: ["Nicole tells a story about being cut off on the drive home after a 14-hour day, and the stories she told herself about the other driver. The car pulled into her neighbor's driveway. What if she had told herself, \"They're as tired as I am and just trying to get home safely\"? The practice is to notice the story early, get curious, and trade up for a better one."] },
+  { id: "friction", t: "The Cost of Friction", kind: "Link", d: "An estimate of what friction costs your team, on the PeopleGro website.",
+    paras: ["You may choose to do nothing about friction, but you can't avoid paying its cost: in energy, morale, relationships, and results."],
+    links: [{ href: "https://www.peoplegro.com/humanfrictioncalc", text: "Open the Human Friction Calculator" }] },
+  { id: "iopt", t: "I-OPT Videos", kind: "Video", d: "Videos on the I-OPT styles and what they mean.",
+    videos: [{ id: "361085877", title: "IOpt Style Names: What Do the Words Mean?" }, { id: "361084585", title: "An Introduction to IOpt: Supporting You in How You Do What You Do" }, { id: "361088237", title: "IOpt Patterns: Focusing on Your Sweet Spot" }] },
 ];
 
-const TABS = ["Profile","Team","Patterns","Reports","Resources","Coach"];
-const TAB_ICONS: any = { Profile:"👤", Team:"👥", Patterns:"🔗", Reports:"📄", Resources:"📚", Coach:"💬" };
-const TYPE_ICONS: any = { video:"🎥", pdf:"📄", article:"📝", link:"🔗" };
-const TYPE_COLORS: any = { video:"#7C3AED", pdf:G.red, article:G.green, link:G.charcoal };
+// ---------------------------------------------------------------------------
+// Profile logic (rules confirmed with PeopleGro and PCI)
+// ---------------------------------------------------------------------------
+function analyze(sc: Record<Code, number>) {
+  const sorted = ORDER.slice().sort((a, b) => sc[b] - sc[a]);
+  const [top, second, third] = sorted;
+  const [s1, s2, s3, s4] = sorted.map(c => sc[c]);
+  let pattern = PAT[top + "+" + second] || PAT[top + "+" + third] || "None";
+  let type: string, moment: string, overTime: string, msg: string;
+  const balanced = ORDER.every(c => sc[c] >= 12 && sc[c] <= 13);
+  if (balanced) {
+    type = "Balanced"; moment = "Less predictable"; overTime = "Less predictable"; pattern = "No single pattern";
+    msg = "Your four scores are about equal. You have no single preferred style and no single pattern, so you can draw on every style. The trade-off is that others may find you harder to anticipate. Naming what you need, and which style you're bringing to a situation, helps people work with you. Balanced profiles are rare. In PCI's experience, they often show up during a major shift in someone's life, and they usually don't stay balanced.";
+  } else if (s1 - s2 <= 5 && OPP[top] === second && Math.abs(s3 - s4) <= 1) {
+    type = "Balanced split"; moment = "Less predictable"; overTime = "Less predictable"; pattern = "No single pattern";
+    msg = "Your top two styles, " + top + " and " + second + ", are close and sit on opposite sides of the I-OPT model, and your other two are about equal. There's no single preferred style and no single pattern leading the way. You bring a wide range, and others may find you harder to anticipate. It helps to tell people which style you're working from.";
+  } else if (s1 - s2 <= 5) {
+    type = "Split style"; moment = "Less predictable"; overTime = "Predictable";
+    msg = "Your top two scores, " + top + " and " + second + ", are within 5 points of each other. That's called a split style. In any given moment, you might respond from either one, so people may find you harder to read day to day. Over time, though, your " + pattern + " pattern is clear and consistent. For you, your pattern often describes you better than either style on its own.";
+  } else if (s2 - s3 <= 5) {
+    const p1 = PAT[top + "+" + second], p2 = PAT[top + "+" + third];
+    pattern = [p1, p2].filter(Boolean).join(" / ") || "None";
+    type = "Split pattern"; moment = "Predictable"; overTime = "Less predictable";
+    msg = "Your " + top + " preferred style is clear, so people can usually predict your first response. Your next two styles, " + second + " and " + third + ", are within 5 points, so over time you may move between two patterns" + (p1 && p2 ? ": " + p1 + " and " + p2 : "") + ". People may see you as consistent in the moment but harder to read over the long run.";
+  } else {
+    type = "Clear profile"; moment = "Predictable"; overTime = "Predictable";
+    msg = "Your " + top + " preferred style is clearly your starting point, and your " + pattern + " pattern shows up consistently over time. People who work with you usually know what to expect. Switching to other styles may take more deliberate effort, especially your less-used ones.";
+  }
+  const isBal = type === "Balanced" || type === "Balanced split";
+  return { sorted, top, second, third, s1, type, moment, overTime, msg, pattern, isBal, strong: !isBal && s1 > 20 };
+}
 
-function dominant(p: any) { return Object.entries(p).sort((a:any,b:any)=>b[1]-a[1])[0][0]; }
-function second(p: any) { return Object.entries(p).sort((a:any,b:any)=>b[1]-a[1])[1][0]; }
-function getPattern(p: any) {
-  const d = dominant(p), s = second(p);
-  return Object.entries(PATTERNS).find(([,pat]:any) => pat.styles.includes(d) && pat.styles.includes(s));
+// ---------------------------------------------------------------------------
+// Small building blocks
+// ---------------------------------------------------------------------------
+const pillStyle = (on: boolean): any => ({ background: on ? C.ink : "#FFFFFF", color: on ? "#FFFFFF" : C.ink, border: on ? "2px solid " + C.ink : "1px solid " + C.pillLine, borderRadius: 18, padding: "8px 13px", fontFamily: FONT, fontSize: 13, cursor: "pointer", minHeight: 36 });
+const label: any = { fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: C.muted };
+const col = (gap = 12): any => ({ display: "flex", flexDirection: "column", gap });
+const card = (border = C.line, bg = "#FFFFFF"): any => ({ border: "1px solid " + border, background: bg, borderRadius: 16, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8 });
+const p14: any = { margin: 0, fontSize: 14, lineHeight: 1.6 };
+const p13: any = { margin: 0, fontSize: 13, lineHeight: 1.55 };
+const textarea: any = { border: "1px solid " + C.line, borderRadius: 10, padding: 10, fontSize: 13, resize: "vertical", fontFamily: FONT };
+
+function Pills({ items, value, onChange }: { items: [string, string][]; value: string; onChange: (v: string) => void }) {
+  return <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{items.map(([v, l]) => <button key={v} onClick={() => onChange(v)} style={pillStyle(value === v)}>{l}</button>)}</div>;
 }
 
 function Logo() {
+  return <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}><span style={{ fontSize: 19, fontWeight: "bold", color: C.brand }}>PeopleGro</span><span style={{ fontSize: 19, color: C.brandLight }}>Insights</span></div>;
+}
+
+function PrintButton() {
+  return <button onClick={() => window.print()} style={{ background: C.ink, color: "#FFFFFF", border: "none", borderRadius: 20, padding: "10px 16px", fontFamily: FONT, fontSize: 13, cursor: "pointer" }}>Download PDF</button>;
+}
+
+function Shape({ sc, a }: { sc: Record<Code, number>; a: any }) {
+  const cx = 130, cy = 130, k = 110 / 30;
+  const r = (v: number) => Math.min(v, 30) * k;
+  const pts: Record<Code, [number, number]> = { RS: [cx, cy - r(sc.RS)], LP: [cx + r(sc.LP), cy], HA: [cx, cy + r(sc.HA)], RI: [cx - r(sc.RI), cy] };
+  const poly = (["RS", "LP", "HA", "RI"] as Code[]).map(c => pts[c][0].toFixed(1) + "," + pts[c][1].toFixed(1)).join(" ");
+  let dx = cx, dy = cy;
+  if (!a.isBal) { dx = cx + (pts[a.top as Code][0] - cx + pts[a.second as Code][0] - cx) * 0.35; dy = cy + (pts[a.top as Code][1] - cy + pts[a.second as Code][1] - cy) * 0.35; }
+  const me = STY[a.top as Code];
   return (
-    <div style={{display:"flex",alignItems:"center",gap:10}}>
-      <svg width="40" height="40" viewBox="0 0 100 100">
-        <path d="M50 18 C50 18 28 36 28 57 C28 70 38 80 50 82 C62 80 72 70 72 57 C72 36 50 18 50 18Z" fill={G.green}/>
-        <path d="M50 28 C50 28 16 46 20 72 C22 84 36 90 50 82 C34 74 26 63 30 50 C34 37 50 28 50 28Z" fill={G.charcoal} opacity={0.45}/>
-        <path d="M50 28 C50 28 84 46 80 72 C78 84 64 90 50 82 C66 74 74 63 70 50 C66 37 50 28 50 28Z" fill={G.red} opacity={0.85}/>
-        <circle cx="50" cy="54" r="9" fill={G.green}/>
-        <circle cx="50" cy="50" r="5" fill={G.charcoal} opacity={0.35}/>
-      </svg>
-      <div>
-        <div style={{lineHeight:1.1}}>
-          <span style={{fontSize:20,fontWeight:400,color:G.green,fontFamily:"Georgia,serif"}}>people</span>
-          <span style={{fontSize:20,fontWeight:700,color:G.charcoal,fontFamily:"Georgia,serif"}}>gro</span>
-        </div>
-        <div style={{fontSize:9,fontWeight:700,color:G.green,letterSpacing:3,textTransform:"uppercase" as const}}>Insights</div>
-      </div>
-    </div>
+    <svg width="200" height="200" viewBox="0 0 260 260" role="img" aria-label="Your profile shape">
+      <line x1="130" y1="10" x2="130" y2="250" stroke="#9AA89D" strokeWidth="2" />
+      <line x1="10" y1="130" x2="250" y2="130" stroke="#9AA89D" strokeWidth="2" />
+      <polygon points={poly} fill={me.light} stroke={me.color} strokeWidth="2.5" />
+      <circle cx={dx} cy={dy} r="7" fill={C.ink} />
+      <text x="130" y="8" textAnchor="middle" fontSize="13" fontWeight="bold" fill={STY.RS.color} dominantBaseline="hanging">RS</text>
+      <text x="252" y="126" textAnchor="end" fontSize="13" fontWeight="bold" fill={STY.LP.color}>LP</text>
+      <text x="130" y="256" textAnchor="middle" fontSize="13" fontWeight="bold" fill={STY.HA.color}>HA</text>
+      <text x="8" y="126" fontSize="13" fontWeight="bold" fill={STY.RI.color}>RI</text>
+    </svg>
   );
 }
 
-function Badge({ style, size="md" }: any) {
-  const s = STYLES[style];
-  const sz: any = { sm:28, md:42, lg:56 };
-  const sz2 = sz[size];
-  return (
-    <div style={{width:sz2,height:sz2,borderRadius:sz2/2,background:s.color,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:sz2*0.27,flexShrink:0,letterSpacing:"-0.5px",fontFamily:"Georgia,serif"}}>
-      {style}
-    </div>
-  );
-}
-
-function KiteProfile({ profile }: any) {
-  const cx=105, cy=105, maxR=80, maxScore=50;
-  const angles: any = { RS:-90, LP:0, HA:90, RI:180 };
-  const lpos: any = { RS:{lx:cx,ly:cy-maxR-22}, LP:{lx:cx+maxR+24,ly:cy}, HA:{lx:cx,ly:cy+maxR+22}, RI:{lx:cx-maxR-24,ly:cy} };
-  const toXY = (st: string, v: number) => {
-    const r = (Math.min(v,maxScore)/maxScore)*maxR;
-    const a = angles[st]*(Math.PI/180);
-    return { x: cx+r*Math.cos(a), y: cy+r*Math.sin(a) };
-  };
-  const pts = ["RS","LP","HA","RI"].map(st => toXY(st, profile[st]));
-  const poly = pts.map(p => p.x+","+p.y).join(" ");
-  const sOff: any = { RS:{dx:22,dy:0}, LP:{dx:0,dy:-15}, HA:{dx:-22,dy:0}, RI:{dx:0,dy:15} };
-  return (
-    <div style={{display:"flex",flexDirection:"column" as const,alignItems:"center",marginBottom:16}}>
-      <svg width={260} height={260} viewBox="-20 -20 260 260">
-        {[10,20,30,40,50].map(r => {
-          const rad = (r/maxScore)*maxR;
-          const rpts = ["RS","LP","HA","RI"].map(st => {
-            const a = angles[st]*(Math.PI/180);
-            return (cx+rad*Math.cos(a))+","+(cy+rad*Math.sin(a));
-          }).join(" ");
-          return <polygon key={r} points={rpts} fill="none" stroke="#E2E8F0" strokeWidth={r===50?1.5:1}/>;
-        })}
-        {["RS","LP","HA","RI"].map(st => {
-          const a = angles[st]*(Math.PI/180);
-          return <line key={st} x1={cx} y1={cy} x2={cx+maxR*Math.cos(a)} y2={cy+maxR*Math.sin(a)} stroke="#D1D5DB" strokeWidth={1} strokeDasharray="3,3"/>;
-        })}
-        <polygon points={poly} fill={G.green+"1A"} stroke={G.green} strokeWidth={2.5} strokeLinejoin="round"/>
-        {["RS","LP","HA","RI"].map(st => {
-          const p = toXY(st, profile[st]);
-          return <circle key={st} cx={p.x} cy={p.y} r={5} fill={STYLES[st].color} stroke="#fff" strokeWidth={2}/>;
-        })}
-        {["RS","LP","HA","RI"].map(st => {
-          const p = toXY(st, profile[st]);
-          const off = sOff[st];
-          return <text key={st+"s"} x={p.x+off.dx} y={p.y+off.dy} textAnchor="middle" dominantBaseline="central" fill={STYLES[st].color} fontSize={10} fontWeight="bold" fontFamily="Georgia,serif">{profile[st]}</text>;
-        })}
-        {[10,20,30,40,50].map(r => (
-          <text key={r} x={cx+4} y={cy-((r/maxScore)*maxR)+4} fill="#94A3B8" fontSize={8} fontFamily="Georgia,serif">{r}</text>
-        ))}
-        {Object.entries(lpos).map(([st,pos]:any) => (
-          <g key={st}>
-            <circle cx={pos.lx} cy={pos.ly} r={15} fill={STYLES[st].color}/>
-            <text x={pos.lx} y={pos.ly} textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={11} fontWeight="bold" fontFamily="Georgia,serif">{st}</text>
-          </g>
-        ))}
-      </svg>
-      <div style={{display:"flex",gap:12,flexWrap:"wrap" as const,justifyContent:"center"}}>
-        {Object.entries(STYLES).map(([st,sv]:any) => (
-          <div key={st} style={{display:"flex",alignItems:"center",gap:5}}>
-            <div style={{width:9,height:9,borderRadius:5,background:sv.color}}/>
-            <span style={{fontSize:11,color:G.charcoal,fontWeight:"bold"}}>{st}</span>
-            <span style={{fontSize:11,color:G.charcoalLight}}>{profile[st]}/50</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ProfileTab({ profile }: any) {
-  const dom = dominant(profile);
-  const s = STYLES[dom];
-  const pat = getPattern(profile);
+// ---------------------------------------------------------------------------
+// Profile tab
+// ---------------------------------------------------------------------------
+function ProfileTab({ sc, a, goTap }: any) {
   const [view, setView] = useState("overview");
   return (
-    <div>
-      <div style={{background:"linear-gradient(135deg,"+s.light+",#fff)",border:"1.5px solid "+s.border,borderRadius:18,padding:18,marginBottom:16}}>
-        <div style={{display:"flex",gap:14,alignItems:"flex-start",marginBottom:12}}>
-          <Badge style={dom} size="lg"/>
-          <div style={{flex:1}}>
-            <p style={{fontSize:10,color:"#94A3B8",textTransform:"uppercase" as const,letterSpacing:2,fontWeight:"bold",margin:"0 0 2px"}}>Dominant Style</p>
-            <h2 style={{fontSize:20,fontWeight:"bold",color:s.color,margin:"0 0 5px",lineHeight:1.2}}>{s.label}</h2>
-            <div style={{display:"inline-block",background:s.color,color:"#fff",borderRadius:20,padding:"3px 12px",fontSize:11,fontWeight:"bold",marginBottom:6}}>"{s.motto}"</div>
-            <p style={{fontSize:12,color:"#475569",margin:0,lineHeight:1.6}}>{s.description}</p>
+    <div style={col(16)}>
+      <Pills items={[["overview", "Overview"], ["comm", "Comm Tips"], ["behavior", "Behavior"], ["change", "Change"]]} value={view} onChange={setView} />
+      {view === "overview" && <Overview sc={sc} a={a} goTap={goTap} />}
+      {view === "comm" && <CommTips a={a} />}
+      {view === "behavior" && <Behavior a={a} />}
+      {view === "change" && <Change a={a} />}
+    </div>
+  );
+}
+
+function Overview({ sc, a, goTap }: any) {
+  const [how, setHow] = useState(false);
+  const [notes, setNotes] = useState("");
+  const me = STY[a.top as Code];
+  return (
+    <div style={col(16)}>
+      <div style={{ ...card(me.border, me.light), padding: 18 }}>
+        <span style={label}>{a.isBal ? "Your highest score" : "Your preferred style"}</span>
+        <span style={{ fontSize: 22, fontWeight: "bold", color: me.color }}>{a.top}: {me.name}</span>
+        <p style={p14}>This is the style that works for you most of the time, so it's where you naturally start. Remember, you have access to all four styles, all the time. When your usual approach isn't getting the results you want, a good strategy is to intentionally tap into the other styles.</p>
+        <p style={{ ...p13, color: C.sub }}>Your style's question is <b style={{ color: me.color }}>{me.q}</b> It's the first thing you want answered before you act.</p>
+        <button onClick={() => setHow(!how)} style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, fontFamily: FONT, fontSize: 13, color: C.ink, textDecoration: "underline", cursor: "pointer" }}>How does I-OPT work?</button>
+      </div>
+
+      {how && (
+        <div style={card()}>
+          <p style={p13}>I-OPT looks at two things: how you prefer to take in information, and what you prefer to do with it.</p>
+          <p style={p13}><b>Structured:</b> step by step, A to B to C. <b>Unpatterned:</b> making connections, A to E to B to Z. Unpatterned doesn't mean unstructured. It's a different kind of logic.</p>
+          <p style={p13}><b>Action:</b> getting things done you can see and measure. <b>Thought:</b> planning, analyzing, reasoning things through.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "90px repeat(2, minmax(0, 1fr))", gap: 6, fontSize: 12, textAlign: "center" }}>
+            <span /><b>Action</b><b>Thought</b>
+            <b style={{ textAlign: "left" }}>Structured</b>
+            <span style={{ background: STY.LP.light, color: STY.LP.color, borderRadius: 8, padding: "8px 4px" }}>LP Logical Processor</span>
+            <span style={{ background: STY.HA.light, color: STY.HA.color, borderRadius: 8, padding: "8px 4px" }}>HA Hypothetical Analyzer</span>
+            <b style={{ textAlign: "left" }}>Unpatterned</b>
+            <span style={{ background: STY.RS.light, color: STY.RS.color, borderRadius: 8, padding: "8px 4px" }}>RS Reactive Stimulator</span>
+            <span style={{ background: STY.RI.light, color: STY.RI.color, borderRadius: 8, padding: "8px 4px" }}>RI Relational Innovator</span>
           </div>
+          <p style={{ ...p13, color: C.sub }}>The style names describe how you work. They aren't labels. Everyone uses all four, and your preferred style is simply where you prefer to operate.</p>
         </div>
-        <div style={{background:G.greenPale,border:"1px solid "+G.greenBorder,borderRadius:12,padding:"9px 13px",marginBottom:8,display:"flex",gap:9,alignItems:"center"}}>
-          <span style={{fontSize:18}}>🎁</span>
-          <div>
-            <p style={{fontSize:9,fontWeight:"bold",color:G.green,textTransform:"uppercase" as const,letterSpacing:1,margin:"0 0 1px"}}>Your Gift to Every Team</p>
-            <p style={{fontSize:12,color:G.charcoal,margin:0,fontWeight:"bold"}}>{s.gift}</p>
-          </div>
-        </div>
-        {pat && (
-          <div style={{background:"rgba(255,255,255,0.85)",borderRadius:10,padding:"7px 10px",display:"flex",alignItems:"center",gap:8}}>
-            <div style={{display:"flex",gap:4}}>{(pat[1] as any).styles.map((st:string) => <Badge key={st} style={st} size="sm"/>)}</div>
-            <div>
-              <p style={{fontSize:10,fontWeight:"bold",color:(pat[1] as any).color,margin:0}}>Pattern: {pat[0]}</p>
-              <p style={{fontSize:10,color:"#64748B",margin:0}}>{(pat[1] as any).desc.split(".")[0]}.</p>
+      )}
+
+      <div style={col(10)}>
+        <span style={label}>Your four scores (out of 50)</span>
+        {ORDER.map(c => {
+          const v = sc[c];
+          return (
+            <div key={c} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: 28, fontSize: 13, fontWeight: "bold", color: STY[c].color }}>{c}</span>
+              <div style={{ flex: "1 1 auto", height: 12, background: "#EEF2EC", borderRadius: 6, overflow: "hidden" }}><div style={{ width: Math.min(100, Math.round(v / 30 * 100)) + "%", height: 12, background: STY[c].color, borderRadius: 6 }} /></div>
+              <span style={{ width: 34, textAlign: "right", fontSize: 13, fontWeight: "bold" }}>{v}</span>
+              <span style={{ width: 74, fontSize: 11, color: C.muted }}>{v > 20 ? "High" : v >= 10 ? "Moderate" : "Low"}</span>
             </div>
+          );
+        })}
+        <p style={{ margin: 0, fontSize: 12, color: C.muted, lineHeight: 1.5 }}>Your four scores add up to about 50. Everyone has some of each style. A low score means you use that style less naturally, not that you can't use it.</p>
+      </div>
+
+      <div style={{ ...col(14), borderTop: "1px solid " + C.line, paddingTop: 16 }}>
+        <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+          <Shape sc={sc} a={a} />
+          <div style={{ ...col(8), flex: "1 1 160px" }}>
+            <span style={label}>Your profile type</span>
+            <b style={{ fontSize: 20 }}>{a.type}</b>
+            <div style={{ ...col(4), fontSize: 12 }}>
+              <span><b>In the moment:</b> {a.moment}</span>
+              <span><b>Over time:</b> {a.overTime}</span>
+              <span><b>Pattern:</b> {a.pattern}</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ ...card(C.line, C.soft), fontSize: 14, lineHeight: 1.6 }}>{a.msg}</div>
+        {a.strong && (
+          <div style={{ ...card(me.border, me.light), fontSize: 13, lineHeight: 1.6 }}>
+            <b style={{ fontSize: 15, color: me.color }}>When your preferred style is strong</b>
+            <span>A high score means this style has worked for you, a lot. That's a strength. It also means you may keep reaching for it even when it isn't working, and that's where you can get worn out.</span>
+            <span><b>For {a.top}:</b> {me.strong}</span>
+            <button onClick={goTap} style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, fontFamily: FONT, fontSize: 13, color: C.ink, textDecoration: "underline", cursor: "pointer" }}>When you're stuck, you might explore another style</button>
           </div>
         )}
-      </div>
-
-      <div style={{display:"flex",gap:5,marginBottom:14}}>
-        {[["overview","Overview"],["comm","Comm Tips"],["snowflake","❄️ Snowflake"],["cultural","🌍 Culture"]].map(([v,l]) => (
-          <button key={v} onClick={() => setView(v)} style={{flex:1,padding:"7px 3px",borderRadius:10,border:"1.5px solid "+(view===v?s.color:G.border),background:view===v?s.light:"#fff",color:view===v?s.color:G.charcoalLight,fontSize:10,fontWeight:"bold",cursor:"pointer",fontFamily:"Georgia,serif"}}>{l}</button>
-        ))}
-      </div>
-
-      {view==="overview" && (
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
-          {[["💪 Strengths",s.strengths],["⚠️ Watch for",s.challenges],["🔥 Motivated by",s.motivators],["🎯 Leadership",s.leaderStyle]].map(([lbl,val]) => (
-            <div key={lbl} style={{background:G.offWhite,borderRadius:12,padding:"10px 12px"}}>
-              <p style={{fontSize:10,fontWeight:"bold",color:"#64748B",margin:"0 0 4px"}}>{lbl}</p>
-              <p style={{fontSize:11,color:"#1E293B",margin:0,lineHeight:1.5}}>{val}</p>
-            </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, fontSize: 12, lineHeight: 1.45 }}>
+          {[["Your preferred style", "Your most likely response to a new issue"], ["Your second preferred style", "Your next most likely response, if your preferred style doesn't fit"], ["Your less-used styles", "The ones you're least likely to reach for, though you can"], ["Your pattern (the dot)", "How you tend to behave over time"]].map(([h, t]) => (
+            <div key={h} style={{ border: "1px solid " + C.line, borderRadius: 10, padding: 10 }}><b>{h}</b><br />{t}</div>
           ))}
         </div>
-      )}
-      {view==="comm" && (
-        <div style={{background:G.greenPale,border:"1px solid "+G.greenBorder,borderRadius:14,padding:"14px 16px",marginBottom:16}}>
-          <p style={{fontSize:10,color:G.green,textTransform:"uppercase" as const,letterSpacing:2,fontWeight:"bold",margin:"0 0 10px"}}>How to communicate with you</p>
-          {s.commTips.map((tip:string,i:number) => (
-            <div key={i} style={{display:"flex",gap:8,marginBottom:7,alignItems:"flex-start"}}>
-              <div style={{width:17,height:17,borderRadius:9,background:s.color,color:"#fff",fontSize:9,fontWeight:"bold",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:1}}>{i+1}</div>
-              <p style={{fontSize:12,color:"#334155",margin:0,lineHeight:1.5}}>{tip}</p>
-            </div>
-          ))}
+        <div style={{ ...col(6), fontSize: 13, lineHeight: 1.55 }}>
+          <b>How far apart your styles are matters</b>
+          <span>If your second style is close to your preferred style, moving between them is easy. If there's a big gap, that switch takes more deliberate effort, or help from someone who works from that style.</span>
         </div>
-      )}
-      {view==="snowflake" && (
-        <div style={{marginBottom:16}}>
-          <p style={{fontSize:11,color:"#64748B",marginBottom:10}}>Behavioral characteristics of the <strong style={{color:s.color}}>{s.label}</strong>:</p>
-          <div style={{display:"flex",flexWrap:"wrap" as const,gap:6}}>
-            {s.snowflake.map((t:string,i:number) => <span key={i} style={{background:s.light,border:"1px solid "+s.border,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:"bold",color:s.color}}>{t}</span>)}
-          </div>
+        <div style={{ ...card("transparent", C.neutral), fontSize: 13, lineHeight: 1.55 }}>
+          <b>Your profile can change</b>
+          <span>Your profile reflects the strategies that work for you right now, and it can change. Profiles can shift with life changes, like a new job or a major life event, or when you choose to develop a style to reach a goal. Whatever the reason, your profile describes where you are right now.</span>
         </div>
-      )}
-      {view==="cultural" && (
-        <div style={{marginBottom:16}}>
-          <p style={{fontSize:11,color:"#64748B",marginBottom:10}}>Cultural tendencies of the <strong style={{color:s.color}}>{s.label}</strong>:</p>
-          <div style={{display:"flex",flexWrap:"wrap" as const,gap:6}}>
-            {s.cultural.map((t:string,i:number) => <span key={i} style={{background:G.offWhite,border:"1px solid "+G.border,borderRadius:20,padding:"3px 10px",fontSize:11,fontWeight:"bold",color:G.charcoal}}>{t}</span>)}
-          </div>
+      </div>
+
+      {!a.isBal && (
+        <div style={card(C.line, C.soft)}>
+          <b style={{ fontSize: 14 }}>Most people don't process information the way you do</b>
+          <p style={p13}>About {me.share}% of people share your preferred style. That means roughly {100 - me.share} out of every 100 people you work with take in information differently and think about time, detail, and risk differently than you do. What feels obvious to you may not be obvious to them.</p>
         </div>
       )}
 
-      <h3 style={{fontSize:13,fontWeight:"bold",color:G.charcoal,margin:"0 0 14px"}}>Your Strategic Profile (Kite)</h3>
-      <KiteProfile profile={profile}/>
-      <p style={{fontSize:10,color:G.charcoalLight,textAlign:"center" as const,margin:"0 0 8px"}}>Scores from your I-OPT assessment (out of 50)</p>
+      <div style={{ ...card(me.border), padding: 16, gap: 10 }}>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12 }}>
+          <span><b>Key idea:</b> {me.key}</span>
+          <span><b>Motto:</b> "{me.motto}"</span>
+        </div>
+        <p style={p14}>{me.desc}</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, fontSize: 12, lineHeight: 1.5 }}>
+          {[["What you bring", me.bring], ["Something to notice", me.watch], ["What motivates you", me.motivates], ["Your gift to the team", me.gift]].map(([h, t]) => (
+            <div key={h} style={{ background: C.soft, borderRadius: 10, padding: 10 }}><b style={{ color: me.color }}>{h}</b><br />{t}</div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ border: "1px dashed " + C.pillLine, borderRadius: 16, padding: 16, ...col(8) }}>
+        <b style={{ fontSize: 14 }}>What stood out?</b>
+        <label htmlFor="reflect" style={{ fontSize: 12, color: C.sub }}>What do you love about your results? What made you think "hmm"? Notice one thing about how you process information this week.</label>
+        <textarea id="reflect" rows={3} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Private notes (not saved yet in this test version)" style={textarea} />
+        <span style={{ fontSize: 12, color: C.muted }}>You might share one of these with someone on your team.</span>
+      </div>
     </div>
   );
 }
 
-function TeamTab({ profile, team, teamName }: any) {
-  const dom = dominant(profile);
-  const all = [dom, ...team.map((m:any) => m.style)];
-  const counts: any = Object.fromEntries(Object.keys(STYLES).map(s => [s,0]));
-  all.forEach((s:string) => counts[s]++);
-  const missing = Object.entries(counts).filter(([,v]:any) => v===0).map(([k]) => k);
+function CommTips({ a }: any) {
+  const order = [a.top as Code].concat(ORDER.filter(c => c !== a.top));
   return (
-    <div>
-      <div style={{background:"linear-gradient(135deg,"+G.greenPale+",#fff)",border:"1px solid "+G.greenBorder,borderRadius:14,padding:"12px 16px",marginBottom:16,display:"flex",gap:10,alignItems:"center"}}>
-        <span style={{fontSize:20}}>🪷</span>
-        <div>
-          <p style={{fontSize:11,fontWeight:"bold",color:G.green,margin:"0 0 2px",textTransform:"uppercase" as const,letterSpacing:1}}>The PeopleGro Model</p>
-          <p style={{fontSize:12,color:G.charcoal,margin:0,lineHeight:1.5}}><strong>How Matters.</strong> Human beings are information processing organisms — understanding styles transforms team dynamics.</p>
-        </div>
-      </div>
-      <div style={{background:G.offWhite,borderRadius:16,padding:16,marginBottom:18}}>
-        <p style={{fontSize:10,color:"#94A3B8",textTransform:"uppercase" as const,letterSpacing:2,fontWeight:"bold",margin:"0 0 12px"}}>{teamName ? teamName+" · " : ""}Team Composition · {all.length} people</p>
-        <div style={{display:"flex",gap:12,flexWrap:"wrap" as const,marginBottom:10}}>
-          {Object.entries(counts).map(([st,ct]:any) => (
-            <div key={st} style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:4,opacity:ct===0?0.2:1}}>
-              <Badge style={st} size="sm"/><span style={{fontSize:10,color:"#64748B"}}>x{ct}</span>
+    <div style={col(12)}>
+      <p style={{ ...p13, color: C.sub }}>What tends to work with each style. Yours is first, so you can share it with your team if you'd like.</p>
+      {order.map(c => {
+        const s = STY[c]; const mine = c === a.top;
+        return (
+          <div key={c} style={card(s.border, mine ? s.light : "#FFFFFF")}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <b style={{ color: s.color, fontSize: 15 }}>What tends to work with an {c}</b>
+              {mine && <span style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", background: s.color, color: "#FFFFFF", borderRadius: 10, padding: "3px 8px" }}>What works with me</span>}
             </div>
-          ))}
-        </div>
-        <div style={{height:7,borderRadius:6,overflow:"hidden",display:"flex",gap:1,marginBottom:12}}>
-          {Object.entries(counts).filter(([,c]:any) => c>0).map(([st,ct]:any) => <div key={st} style={{flex:ct,background:STYLES[st].color}}/>)}
-        </div>
-        <p style={{fontSize:10,color:G.green,fontWeight:"bold",textTransform:"uppercase" as const,letterSpacing:1,margin:"0 0 6px"}}>Gifts on this team</p>
-        {all.filter((v:string,i:number,a:string[]) => a.indexOf(v)===i).map((st:string) => (
-          <div key={st} style={{display:"flex",gap:6,marginBottom:5,alignItems:"flex-start"}}>
-            <span style={{fontSize:11,fontWeight:"bold",color:STYLES[st].color,width:28,flexShrink:0}}>{st}</span>
-            <span style={{fontSize:11,color:"#475569"}}>{STYLES[st].gift}</span>
+            <span style={{ fontSize: 12 }}><b>Words that land:</b> {s.words}</span>
+            {s.tips.map((t: string) => <div key={t} style={{ display: "flex", gap: 8, fontSize: 13, lineHeight: 1.45 }}><span style={{ color: s.color }}>•</span><span>{t}</span></div>)}
           </div>
-        ))}
-        {missing.length>0 && <div style={{background:"#FFFBEB",border:"1px solid #FCD34D",borderRadius:10,padding:"8px 12px",fontSize:11,color:"#92400E",marginTop:8}}>⚠️ Missing gifts: {missing.join(", ")}</div>}
-        <div style={{background:G.greenPale,border:"1px solid "+G.greenBorder,borderRadius:10,padding:"8px 12px",fontSize:11,color:G.charcoal,marginTop:8}}>📊 Teams spend ~16 hrs/week miscommunicating · $18K+ per team in non-productive conflict</div>
+        );
+      })}
+      <div style={card()}>
+        <b style={{ fontSize: 15 }}>What tends to work with each pattern</b>
+        {PATTERN_TIPS.map(p => <div key={p.name} style={{ fontSize: 13, lineHeight: 1.5 }}><b>{p.name}</b> ({p.combo}): {p.tip}</div>)}
       </div>
-      <h3 style={{fontSize:13,fontWeight:"bold",color:G.charcoal,margin:"0 0 10px"}}>Members</h3>
-      {team.length===0 && <p style={{fontSize:12,color:G.charcoalLight}}>No teammates have been added yet.</p>}
-      <div style={{display:"inline-flex",alignItems:"center",gap:6,marginBottom:10,background:STYLES[dom].light,border:"1px solid "+STYLES[dom].border,borderRadius:20,padding:"4px 12px"}}>
-        <Badge style={dom} size="sm"/><span style={{fontSize:11,fontWeight:"bold",color:STYLES[dom].color}}>You · {dom} · "{STYLES[dom].motto}"</span>
-      </div>
-      {team.map((m:any,i:number) => (
-        <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:14,marginBottom:8,background:STYLES[m.style].light,border:"1px solid "+STYLES[m.style].border}}>
-          <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <Badge style={m.style} size="sm"/>
-            <div>
-              <p style={{fontWeight:"bold",fontSize:13,color:"#1E293B",margin:0}}>{m.name}</p>
-              <p style={{fontSize:11,color:"#64748B",margin:"1px 0 0"}}>{STYLES[m.style].label} · {m.pattern}</p>
-              <p style={{fontSize:10,color:"#64748B",margin:"2px 0 0"}}>RS {m.scores.RS} · LP {m.scores.LP} · RI {m.scores.RI} · HA {m.scores.HA}</p>
-            </div>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
 
-function PatternsTab({ profile, team }: any) {
-  const dom = dominant(profile), sec = second(profile), myPat = getPattern(profile);
+function Behavior({ a }: any) {
+  const me = STY[a.top as Code];
+  const order = [a.top as Code].concat(ORDER.filter(c => c !== a.top));
   return (
-    <div>
-      <div style={{background:"linear-gradient(135deg,"+G.greenPale+",#fff)",border:"1px solid "+G.greenBorder,borderRadius:14,padding:"13px 16px",marginBottom:18}}>
-        <p style={{fontSize:10,color:G.green,fontWeight:"bold",textTransform:"uppercase" as const,letterSpacing:1,margin:"0 0 5px"}}>Strategic Patterns</p>
-        <p style={{fontSize:12,color:G.charcoal,margin:0,lineHeight:1.6}}>When two I-OPT styles combine they create a <strong>Strategic Pattern</strong> — a specific signature predicting how someone operates and leads.</p>
+    <div style={col(14)}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><b style={{ fontSize: 18 }}>Behavior</b><PrintButton /></div>
+      <p style={p14}>Behavior is what others see. It's the only part of you that's visible to anyone else, and it drives other people's emotional reactions to you.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, textAlign: "center", fontSize: 12, lineHeight: 1.4 }}>
+        <div style={{ background: me.light, borderRadius: 12, padding: 10 }}><b>Behavior</b><br />What others see</div>
+        <div style={{ background: C.soft, borderRadius: 12, padding: 10 }}><b>Emotions</b><br />A physical reaction</div>
+        <div style={{ background: C.soft, borderRadius: 12, padding: 10 }}><b>Feelings</b><br />The story we tell</div>
       </div>
-      {myPat && (
-        <div style={{marginBottom:20}}>
-          <p style={{fontSize:11,color:"#64748B",fontWeight:"bold",margin:"0 0 8px"}}>YOUR PATTERN ({dom} + {sec}):</p>
-          <div style={{background:(myPat[1] as any).color+"0F",border:"2px solid "+(myPat[1] as any).color+"44",borderRadius:16,padding:"14px 16px"}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-              <div style={{display:"flex",gap:6}}>{(myPat[1] as any).styles.map((st:string) => <Badge key={st} style={st} size="sm"/>)}</div>
-              <h3 style={{fontSize:18,fontWeight:"bold",color:(myPat[1] as any).color,margin:0}}>{myPat[0]}</h3>
+      <div style={col(8)}>
+        <span style={label}>Your behavioral characteristics</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {me.traits.map((t: string) => <span key={t} style={{ background: me.light, border: "1px solid " + me.border, color: me.color, borderRadius: 20, padding: "4px 10px", fontSize: 12, fontWeight: "bold" }}>{t}</span>)}
+        </div>
+      </div>
+      <div style={col(8)}>
+        <span style={label}>How your behavior can be read</span>
+        <p style={{ ...p13, color: C.sub }}>The same behavior can land well or badly, depending on the other person's style and the moment.</p>
+        {order.map(c => {
+          const s = STY[c]; const mine = c === a.top;
+          return (
+            <div key={c} style={{ borderRadius: 12, padding: "10px 12px", background: mine ? s.light : "#FFFFFF", border: "1px solid " + (mine ? s.border : C.line) }}>
+              <b style={{ color: s.color, fontSize: 13 }}>{c}{mine ? " (you)" : ""}</b>
+              <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 4 }}><b>Lands well:</b> {s.good}</div>
+              <div style={{ fontSize: 12, lineHeight: 1.5 }}><b>Causes friction:</b> {s.bad}</div>
             </div>
-            <p style={{fontSize:13,color:"#334155",margin:0,lineHeight:1.6}}>{(myPat[1] as any).desc}</p>
+          );
+        })}
+      </div>
+      <div style={{ ...card("transparent", C.soft), fontSize: 13, lineHeight: 1.55 }}>
+        <b>Why reactions can feel so strong</b>
+        <span>The bigger the difference between your profile and someone else's, the more intense the reaction can be. And the stronger your preferred style, the stronger your response may be.</span>
+        <span>Doing things your way over time proves it works, so it starts to feel like the right way. PeopleGro calls this rightness blindness.</span>
+      </div>
+      <p style={{ ...p13, fontStyle: "italic", color: C.sub }}>Which of these words would the people you work with use to describe you this week?</p>
+    </div>
+  );
+}
+
+function Change({ a }: any) {
+  const me = STY[a.top as Code];
+  const [vals, setVals] = useState<number[]>(ASSESS.map(() => 4));
+  const [chg, setChg] = useState("");
+  return (
+    <div style={col(14)}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><b style={{ fontSize: 18 }}>Change</b><PrintButton /></div>
+      <p style={p14}>Change is personal. Always. It often feels painful because it's easier to see what's going than what's coming. Every style can help at any point in a change, and every style can struggle.</p>
+      <div style={{ border: "2px solid " + me.border, borderRadius: 16, padding: 16, ...col(12) }}>
+        <b style={{ fontSize: 16, color: me.color }}>Your Change Snowflake ({a.top})</b>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+          <div style={{ background: me.light, borderRadius: 12, padding: 12, ...col(6) }}><b style={{ fontSize: 13 }}>Strengths in change</b>{me.snowS.map((t: string) => <span key={t} style={{ fontSize: 12, lineHeight: 1.4 }}>{t}</span>)}</div>
+          <div style={{ background: C.neutral, borderRadius: 12, padding: 12, ...col(6) }}><b style={{ fontSize: 13 }}>Challenges in change</b>{me.snowC.map((t: string) => <span key={t} style={{ fontSize: 12, lineHeight: 1.4 }}>{t}</span>)}</div>
+        </div>
+        <span style={{ fontSize: 11, color: C.muted }}>Change Snowflake © Professional Communications Inc.</span>
+      </div>
+      <div style={{ ...card(me.border, me.light), fontSize: 13, lineHeight: 1.55, gap: 4 }}>
+        <b style={{ color: me.color }}>How you navigate change</b>
+        <span><b>You look for:</b> {me.changeLook}</span>
+        <span><b>You bring:</b> {me.changeBring}</span>
+        <span><b>Your pattern ({a.pattern}):</b> {PCHANGE[a.pattern] || "You may draw on different patterns depending on the change."}</span>
+      </div>
+      <span style={label}>Common reactions to change: the 4 D's</span>
+      {DEES.map(d => (
+        <div key={d.name} style={{ ...card(), fontSize: 12, lineHeight: 1.5, gap: 3 }}>
+          <b style={{ fontSize: 14 }}>{d.name}</b>
+          <span><b>What it can look like:</b> {d.looks}</span>
+          <span><b>You might hear:</b> {d.hear}</span>
+          <span><b>What can help:</b> {d.helps}</span>
+        </div>
+      ))}
+      <span style={{ fontSize: 11, color: C.muted }}>The 4 D's come from Aftershock: Helping People Through Corporate Change, by Woodward and Buchholz.</span>
+      <div style={{ border: "1px solid " + C.pillLine, borderRadius: 16, padding: 16, ...col(12) }}>
+        <b style={{ fontSize: 16 }}>PeopleGro Change Assessment</b>
+        <label htmlFor="chg" style={{ fontSize: 13, color: C.sub }}>Think of a change you're going through right now.</label>
+        <input id="chg" type="text" value={chg} onChange={e => setChg(e.target.value)} placeholder="The change I'm thinking about" style={{ ...textarea, resize: undefined }} />
+        <span style={{ fontSize: 12, color: C.sub }}>For each line, pick the number from 0 to 10 that best describes how you feel about this change.</span>
+        {ASSESS.map(([l, r], i) => (
+          <div key={l} style={col(4)}>
+            <label htmlFor={"as" + i} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, color: C.sub }}><span>{l}</span><span style={{ fontWeight: "bold", color: C.ink }}>{vals[i]}</span><span style={{ textAlign: "right" }}>{r}</span></label>
+            <input id={"as" + i} type="range" min={0} max={10} step={2} value={vals[i]} onChange={e => { const n = vals.slice(); n[i] = Number(e.target.value); setVals(n); }} style={{ width: "100%", accentColor: C.ink }} />
+          </div>
+        ))}
+        <div style={{ ...card("transparent", C.neutral), fontSize: 13, lineHeight: 1.6 }}>Could your processing style be at play? Are you in a D, big or little? What story are you telling yourself? Do you need a Jackalope?</div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Working With tab
+// ---------------------------------------------------------------------------
+function WorkingWithTab({ a, view, setView }: any) {
+  const [lens, setLens] = useState("Risk");
+  const me = STY[a.top as Code];
+  const tapOrder = [a.second as Code].concat(ORDER.filter(c => c !== a.top && c !== a.second));
+  return (
+    <div style={col(16)}>
+      <div style={col(4)}>
+        <b style={{ fontSize: 20, color: C.ink }}>Working With</b>
+        <span style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>How your profile shows up with other people, and how to tap into the styles you use less, on your own or with a Jackalope.</span>
+      </div>
+      <Pills items={[["see", "How each style sees things"], ["tap", "Tap into"], ["stress", "Stress & listening"], ["talk", "Talking to each style"], ["patterns", "Patterns"]]} value={view} onChange={setView} />
+
+      {view === "see" && (
+        <div style={col(10)}>
+          <p style={p14}>Each style sees time, detail, and risk differently. Pick a point to compare all four. Your preferred style is highlighted.</p>
+          <Pills items={["Question", "Time", "Detail", "Risk", "Motto"].map(l => [l, l]) as [string, string][]} value={lens} onChange={setLens} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+            {ORDER.map(c => {
+              const s = STY[c]; const mine = c === a.top;
+              const t = lens === "Question" ? s.q : lens === "Motto" ? s.motto : s[lens];
+              return <div key={c} style={{ borderRadius: 12, padding: "10px 12px", background: mine ? s.light : "#FFFFFF", border: mine ? "2px solid " + s.color : "1px solid " + C.line }}><b style={{ color: s.color, fontSize: 12 }}>{c}{mine ? " (you)" : ""}</b><div style={{ fontSize: 13, lineHeight: 1.45, marginTop: 3 }}>{t}</div></div>;
+            })}
           </div>
         </div>
       )}
-      <p style={{fontSize:11,color:"#64748B",fontWeight:"bold",margin:"0 0 10px"}}>ALL FOUR PATTERNS:</p>
-      {Object.entries(PATTERNS).map(([name,p]:any) => (
-        <div key={name} style={{marginBottom:10,background:G.offWhite,border:"1.5px solid "+(myPat&&myPat[0]===name?p.color+"66":G.border),borderRadius:14,padding:"12px 14px"}}>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:5}}>
-            <div style={{display:"flex",gap:4}}>{p.styles.map((st:string) => <Badge key={st} style={st} size="sm"/>)}</div>
-            <h4 style={{fontSize:14,fontWeight:"bold",color:p.color,margin:0}}>{name}</h4>
-            <span style={{fontSize:10,color:"#94A3B8"}}>{p.styles.join("+")}</span>
-          </div>
-          <p style={{fontSize:12,color:"#475569",margin:0,lineHeight:1.5}}>{p.desc}</p>
-        </div>
-      ))}
-      {team.length>0 && (
-        <div style={{marginTop:16}}>
-          <p style={{fontSize:11,color:"#64748B",fontWeight:"bold",margin:"0 0 10px"}}>YOUR PAIRINGS:</p>
-          {team.map((m:any,i:number) => {
-            const mp = Object.entries(PATTERNS).find(([,p]:any) => p.styles.includes(dom) && p.styles.includes(m.style));
+
+      {view === "tap" && (
+        <div style={col(12)}>
+          <p style={p14}>Your preferred style is a good place to start. If it isn't getting the results you want, one option is to tap into a different approach. You might do that on your own, or reach out to a Jackalope: someone who shows up with wisdom, courage, and honest feedback, and who works from the style you need. Using a style outside your preferred style takes more energy, and that's normal.</p>
+          {tapOrder.map(c => {
+            const s = STY[c];
             return (
-              <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,padding:"9px 12px",background:mp?(mp[1] as any).color+"0A":G.offWhite,border:"1px solid "+(mp?(mp[1] as any).color+"33":G.border),borderRadius:12}}>
-                <Badge style={m.style} size="sm"/>
-                <div>
-                  <p style={{fontSize:12,fontWeight:"bold",color:"#1E293B",margin:0}}>{m.name} ({m.style})</p>
-                  {mp?<p style={{fontSize:11,color:(mp[1] as any).color,margin:0,fontWeight:"bold"}}>You + {m.name} → <strong>{mp[0]}</strong></p>:<p style={{fontSize:11,color:"#94A3B8",margin:0}}>Complementary dynamic</p>}
-                </div>
+              <div key={c} style={card(s.border)}>
+                <b style={{ color: s.color, fontSize: 15 }}>Tap into {c} when...</b>
+                <span style={{ fontSize: 13, lineHeight: 1.5 }}>{s.when}</span>
+                <div style={{ background: s.light, borderRadius: 10, padding: 10, fontSize: 13, lineHeight: 1.5 }}><b>What it might look like:</b> {s.looks}</div>
               </div>
             );
           })}
         </div>
       )}
+
+      {view === "stress" && (
+        <div style={col(14)}>
+          <div style={{ ...card(me.border, me.light), fontSize: 13, lineHeight: 1.55 }}>
+            <b style={{ fontSize: 15, color: me.color }}>Under stress</b>
+            <span>Each style tends to show up in a recognizable way under pressure. Knowing what that looks like for you helps you catch it early.</span>
+            <span><b>You may:</b> {me.stress}</span>
+            <span><b>What triggers it:</b> {me.trigger}</span>
+          </div>
+          <div style={{ ...card(), fontSize: 13, lineHeight: 1.55 }}>
+            <b style={{ fontSize: 15 }}>How you listen</b>
+            <span>{me.listen}</span>
+            <span><b>Something to consider:</b> {me.listenTry}</span>
+          </div>
+          <div style={col(6)}>
+            <b style={{ fontSize: 14 }}>The 5 levels of listening</b>
+            {LEVELS.map(([n, t], i) => (
+              <div key={n} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, lineHeight: 1.45 }}>
+                <span style={{ minWidth: 24, height: 24, borderRadius: 12, background: C.neutral, color: C.ink, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>{i + 1}</span>
+                <span><b>{n}:</b> {t}</span>
+              </div>
+            ))}
+            <span style={{ fontSize: 11, color: C.muted }}>Adapted from The Black Swan Group</span>
+          </div>
+        </div>
+      )}
+
+      {view === "talk" && (
+        <div style={col(14)}>
+          <p style={p14}>The simplest way to talk to any style is to answer their question first.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, textAlign: "center" }}>
+            {ORDER.map(c => <div key={c} style={{ background: STY[c].light, border: "1px solid " + STY[c].border, borderRadius: 12, padding: "10px 6px" }}><b style={{ color: STY[c].color, fontSize: 13 }}>{c}</b><div style={{ fontSize: 18, fontWeight: "bold", marginTop: 2 }}>{STY[c].q}</div></div>)}
+          </div>
+          <div style={{ background: C.soft, borderRadius: 14, padding: "12px 14px", fontSize: 13, lineHeight: 1.55 }}><b>Team tip:</b> Before a big decision, you might ask all four out loud. When will we act? How will it work? What are we doing, and what if it changes? Why this option? If one has no good answer yet, you've found the gap.</div>
+          <b style={{ fontSize: 15 }}>From you ({a.top}) to each style</b>
+          <span style={{ fontSize: 12, color: C.sub }}>Slow down and make sure your words mean the same thing to them. Slower is faster.</span>
+          {ORDER.map(c => <div key={c} style={{ border: "1px solid " + STY[c].border, borderRadius: 14, padding: "12px 14px", fontSize: 13, lineHeight: 1.5 }}><b style={{ color: STY[c].color }}>To {c === a.top ? "another" : "an"} {c} ({STY[c].q})</b><br />{TO[a.top as Code][c]}</div>)}
+        </div>
+      )}
+
+      {view === "patterns" && (
+        <div style={col(12)}>
+          <p style={p14}>Your strategic pattern is the combination of your preferred style and second preferred style. It describes how you tend to work and lead over time.</p>
+          {PATTERNS.map(p => {
+            const mine = a.pattern.indexOf(p.name) >= 0;
+            return (
+              <div key={p.name} style={{ ...col(6), borderRadius: 14, padding: "12px 14px", background: mine ? C.neutral : "#FFFFFF", border: mine ? "2px solid " + C.ink : "1px solid " + C.line }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><b style={{ fontSize: 15 }}>{p.name} ({p.combo})</b><span style={{ fontSize: 12, color: C.muted }}>{p.share}% of people</span></div>
+                <span style={{ fontSize: 13, lineHeight: 1.5 }}>{p.desc}</span>
+                <span style={{ fontSize: 13, lineHeight: 1.5 }}><b>Something to notice:</b> {p.watch}</span>
+              </div>
+            );
+          })}
+          <b style={{ fontSize: 15, marginTop: 6 }}>Working across styles</b>
+          {PAIRS.map(([pair, text]) => <div key={pair} style={{ fontSize: 13, lineHeight: 1.5, borderRadius: 10, padding: "9px 12px", background: pair.indexOf(a.top) >= 0 ? me.light : C.soft }}><b>{pair}</b> {text}</div>)}
+          <span style={{ fontSize: 12, color: C.sub }}>Sharing a style means you use words the same way. It doesn't mean you'll agree, and misfires still happen.</span>
+        </div>
+      )}
     </div>
   );
 }
 
-function ReportsTab({ profile, team }: any) {
-  const [selected, setSelected] = useState("individual");
-  const [generating, setGenerating] = useState(false);
-  const [report, setReport] = useState<any>(null);
-  const dom = dominant(profile);
-  const s = STYLES[dom];
-  const counts: any = Object.fromEntries(Object.keys(STYLES).map(st => [st,0]));
-  [dom,...team.map((m:any) => m.style)].forEach((st:string) => counts[st]++);
-  const missing = Object.entries(counts).filter(([,v]:any) => v===0).map(([k]) => k);
-  const selRpt = REPORT_TYPES.find(r => r.id===selected);
-  const myPat = getPattern(profile);
-
-  const buildPrompt = () => {
-    const p = profile;
-    const pStr = `RS:${p.RS}/50 LP:${p.LP}/50 RI:${p.RI}/50 HA:${p.HA}/50`;
-    const teamStr = team.length>0 ? team.map((m:any) => m.name+"("+m.style+")").join(", ") : "No team members";
-    const prompts: any = {
-      individual: `Profile:${pStr}. Dominant:${dom}. Pattern:${myPat?myPat[0]:"Mixed"}.\nReturn ONLY valid JSON no markdown:\n{"executiveSummary":"2-3 sentences","dominantInPractice":"3 sentences","giftToTeam":"2 sentences","strategicPattern":"2 sentences","strengthsDetail":"3 sentences","developmentAreas":"3 sentences","communicationGuide":"3 sentences","howMatters":"2 sentences","recommendations":["r1","r2","r3","r4"]}`,
-      sales: `Profile:${pStr}. Dominant:${dom}.\nReturn ONLY valid JSON no markdown:\n{"executiveSummary":"2 sentences","naturalSalesStyle":"3 sentences","readingClientStyles":"3 sentences","strengthsInSales":"2 sentences","watchOuts":"2 sentences","closingStyle":"2 sentences","recommendations":["r1","r2","r3","r4"]}`,
-      change: `Profile:${pStr}. Dominant:${dom}.\nReturn ONLY valid JSON no markdown:\n{"executiveSummary":"2 sentences","changeReactionStyle":"3 sentences","strengthsDetail":"2 sentences","developmentAreas":"2 sentences","communicationGuide":"3 sentences","howMatters":"2 sentences","recommendations":["r1","r2","r3","r4"]}`,
-      twoperson: `Person1:${dom}. Person2:${team[0]?team[0].name+"("+team[0].style+")":"Generic LP"}.\nReturn ONLY valid JSON no markdown:\n{"executiveSummary":"2 sentences","naturalSynergies":"3 sentences","naturalTensions":"3 sentences","communicationGuide":"3 sentences","recommendations":["r1","r2","r3","r4"]}`,
-      team: `Leader:${dom}. Team:${teamStr}. Missing:${missing.length>0?missing.join(","):"none"}.\nReturn ONLY valid JSON no markdown:\n{"executiveSummary":"2 sentences","teamPersonality":"3 sentences","naturalStrengths":"3 sentences","developmentAreas":"3 sentences","communicationGuide":"2 sentences","recommendations":["r1","r2","r3","r4"]}`,
-      leader: `Leader:${dom} ${pStr}. Team:${teamStr}.\nReturn ONLY valid JSON no markdown:\n{"executiveSummary":"2 sentences","leaderStyleProfile":"3 sentences","naturalSynergies":"3 sentences","developmentAreas":"2 sentences","communicationGuide":"3 sentences","recommendations":["r1","r2","r3","r4"]}`,
-    };
-    return prompts[selected];
-  };
-
-  const generate = async () => {
-    setGenerating(true); setReport(null);
-    try {
-      const text = await askClaude([{ role:"user", content:buildPrompt() }], "report");
-      const parsed = JSON.parse(text.replace(/```json|```/g,"").trim());
-      setReport({ type:selected, content:parsed });
-    } catch(e) { setReport({ error:true }); }
-    setGenerating(false);
-  };
-
-  const LABELS: any = {
-    executiveSummary:"Executive Summary", dominantInPractice:"Dominant Style in Practice", giftToTeam:"Gift to the Team",
-    strategicPattern:"Strategic Pattern", strengthsDetail:"Strengths", developmentAreas:"Development Areas",
-    communicationGuide:"Communication Guide", howMatters:"How Matters", naturalSalesStyle:"Natural Sales Style",
-    readingClientStyles:"Reading Client Styles", strengthsInSales:"Strengths in Sales", watchOuts:"Watch Outs",
-    closingStyle:"Closing Style", changeReactionStyle:"Natural Reaction to Change", naturalSynergies:"Natural Synergies",
-    naturalTensions:"Natural Tensions", teamPersonality:"Team Personality", naturalStrengths:"Natural Strengths",
-    leaderStyleProfile:"Leader Style Profile",
-  };
-
-  const Sec = ({ title, content }: any) => (
-    <div style={{marginBottom:14}}>
-      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:4}}>
-        <div style={{width:3,height:13,borderRadius:2,background:s.color}}/>
-        <h4 style={{fontSize:11,fontWeight:"bold",color:"#0F172A",margin:0,textTransform:"uppercase" as const,letterSpacing:1}}>{title}</h4>
-      </div>
-      <p style={{fontSize:13,color:"#334155",lineHeight:1.7,margin:0}}>{content}</p>
+// ---------------------------------------------------------------------------
+// Practice tab
+// ---------------------------------------------------------------------------
+function PracticeTab() {
+  const [deeper, setDeeper] = useState(false);
+  const [stuck, setStuck] = useState<Record<string, boolean>>({});
+  const banner = (t: string, s: string) => <div style={{ ...col(2), background: C.neutral, borderRadius: 12, padding: "10px 14px" }}><b style={{ fontSize: 15, color: C.ink }}>{t}</b><span style={{ fontSize: 12, color: C.sub }}>{s}</span></div>;
+  const step = (id: string, n: number, title: string, hint: string) => (
+    <div key={id} style={col(6)}>
+      <label htmlFor={id} style={{ fontSize: 14, fontWeight: "bold" }}>{n}. {title}</label>
+      <span style={{ fontSize: 12, color: C.sub }}>{hint}</span>
+      <textarea id={id} rows={2} style={textarea} />
     </div>
   );
-
   return (
-    <div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:16}}>
-        {REPORT_TYPES.map(r => (
-          <button key={r.id} onClick={() => { setSelected(r.id); setReport(null); }} style={{padding:"9px 5px",borderRadius:11,border:"1.5px solid "+(selected===r.id?s.color:G.border),background:selected===r.id?s.light:"#fff",color:selected===r.id?s.color:G.charcoalLight,textAlign:"center" as const,cursor:"pointer",fontFamily:"Georgia,serif"}}>
-            <div style={{fontSize:16,marginBottom:2}}>{r.icon}</div>
-            <div style={{fontSize:10,fontWeight:"bold",lineHeight:1.3}}>{r.label}</div>
-          </button>
-        ))}
+    <div style={col(14)}>
+      <div style={col(6)}>
+        <b style={{ fontSize: 20, color: C.ink }}>Practice</b>
+        <p style={p14}>When we think we're reacting to someone else's behavior, we're usually reacting to our own emotions and the story we've attached to them. That story happens fast, often with no proof. Slower is faster. This is a place to slow it down.</p>
+        <span style={{ fontSize: 12, color: C.muted }}>Everything you write here is private to you. (In this test version, notes aren't saved yet.)</span>
       </div>
-      <div style={{background:G.offWhite,borderRadius:12,padding:"11px 13px",marginBottom:13,display:"flex",alignItems:"center",gap:10}}>
-        <Badge style={dom} size="sm"/>
-        <div>
-          <p style={{fontSize:12,fontWeight:"bold",color:"#0F172A",margin:"0 0 2px"}}>{selRpt?.label}</p>
-          <p style={{fontSize:11,color:"#64748B",margin:0}}>RS {profile.RS} · LP {profile.LP} · RI {profile.RI} · HA {profile.HA} (out of 50)</p>
-        </div>
-      </div>
-      <button onClick={generate} disabled={generating} style={{width:"100%",padding:"13px",borderRadius:14,fontSize:14,fontWeight:"bold",background:generating?"#CBD5E1":G.green,color:"#fff",border:"none",cursor:generating?"not-allowed":"pointer",fontFamily:"Georgia,serif",marginBottom:16}}>
-        {generating ? "Generating…" : "Generate "+selRpt?.label}
-      </button>
-      {report && !report.error && (
-        <div>
-          <div style={{background:"#fff",border:"1.5px solid "+G.border,borderRadius:18,overflow:"hidden"}}>
-            <div style={{background:"linear-gradient(135deg,"+G.charcoal+","+G.greenDark+")",padding:"16px 20px 12px"}}>
-              <p style={{fontSize:9,color:"rgba(255,255,255,0.5)",textTransform:"uppercase" as const,letterSpacing:2,fontWeight:"bold",margin:"0 0 3px"}}>PeopleGro Insights · {selRpt?.label.toUpperCase()}</p>
-              <h3 style={{color:"#fff",fontSize:16,fontWeight:"bold",margin:"0 0 3px"}}>{selRpt?.label}</h3>
-              <p style={{color:"rgba(255,255,255,0.4)",fontSize:10,margin:0}}>{new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"})} · Powered by I-OPT® · Confidential</p>
-            </div>
-            <div style={{padding:"9px 18px",background:G.offWhite,borderBottom:"1px solid "+G.border,display:"flex",gap:5,flexWrap:"wrap" as const}}>
-              {Object.entries(profile).map(([st,sc]:any) => <span key={st} style={{background:STYLES[st].light,borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:"bold",color:STYLES[st].color}}>{st} {sc}/50</span>)}
-            </div>
-            <div style={{padding:"16px 18px 4px"}}>
-              {Object.entries(report.content).filter(([k]) => k!=="recommendations").map(([key,val]:any) => val && LABELS[key] ? <Sec key={key} title={LABELS[key]} content={val}/> : null)}
-              {report.content.recommendations?.length>0 && (
-                <div style={{marginBottom:18}}>
-                  <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:9}}>
-                    <div style={{width:3,height:13,borderRadius:2,background:G.green}}/>
-                    <h4 style={{fontSize:11,fontWeight:"bold",color:"#0F172A",margin:0,textTransform:"uppercase" as const,letterSpacing:1}}>Recommendations</h4>
-                  </div>
-                  {report.content.recommendations.map((r:string,i:number) => (
-                    <div key={i} style={{display:"flex",gap:10,marginBottom:8,alignItems:"flex-start"}}>
-                      <div style={{width:20,height:20,borderRadius:10,background:G.green,color:"#fff",fontSize:10,fontWeight:"bold",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>{i+1}</div>
-                      <p style={{fontSize:13,color:"#334155",margin:0,lineHeight:1.6}}>{r}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div style={{padding:"8px 18px",background:G.offWhite,borderTop:"1px solid "+G.border}}>
-              <p style={{fontSize:9,color:"#94A3B8",margin:0,textAlign:"center" as const}}>PeopleGro Insights · Powered by I-OPT® (Professional Communications Inc.) · Confidential</p>
-            </div>
+      {banner("Self-Awareness", "Notice what happened, how you reacted, and the story you're telling.")}
+      {step("q1", 1, "What was the behavior?", "What did they actually do or say? Stick to what a camera would have caught.")}
+      {step("q2", 2, "What was your reaction?", "What did you notice in your body? Your body is an early warning system.")}
+      {step("q3", 3, "What story are you telling yourself?", "What did you decide their behavior meant, about them, you, or the situation?")}
+      {banner("Self-Management", "Choose what you'll do next.")}
+      {step("q4", 4, "What's one thing you could explore doing differently?", "Small is fine.")}
+      {!deeper && <button onClick={() => setDeeper(true)} style={{ alignSelf: "flex-start", background: "#FFFFFF", color: C.ink, border: "2px solid " + C.ink, borderRadius: 22, padding: "11px 18px", fontFamily: FONT, fontSize: 14, cursor: "pointer" }}>Does this keep happening? Go deeper</button>}
+      {deeper && (
+        <div style={{ ...col(14), borderTop: "2px solid " + C.line, paddingTop: 14 }}>
+          <b style={{ ...label, color: C.ink, fontSize: 13 }}>Self-Awareness: going deeper</b>
+          <b style={{ fontSize: 16 }}>5. Where might you be stuck?</b>
+          <span style={{ fontSize: 13, lineHeight: 1.55, color: C.sub }}>Mental models work like a pane of glass, framing and quietly distorting what we see. Do any of these feel like they might be at play?</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {STUCK.map(([n]) => <button key={n} aria-pressed={!!stuck[n]} onClick={() => setStuck({ ...stuck, [n]: !stuck[n] })} style={{ ...pillStyle(!!stuck[n]), fontSize: 12 }}>{n}</button>)}
           </div>
-          <button onClick={() => window.print()} style={{width:"100%",marginTop:10,padding:"11px",borderRadius:13,fontSize:13,fontWeight:"bold",background:G.greenPale,color:G.green,border:"1.5px solid "+G.greenBorder,cursor:"pointer",fontFamily:"Georgia,serif"}}>🖨️ Print / Save as PDF</button>
+          {STUCK.filter(([n]) => stuck[n]).map(([n, q]) => <div key={n} style={{ background: C.neutral, borderRadius: 12, padding: "10px 12px", fontSize: 13, lineHeight: 1.5 }}><b>{n}:</b> {q}</div>)}
+          <b style={{ fontSize: 16 }}>6. Is processing style at play?</b>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, fontSize: 12, lineHeight: 1.4 }}>
+            <div style={{ border: "1px solid " + C.line, borderRadius: 12, padding: 10 }}><b>How do they take in information?</b><br />Step by step / They jump around and make connections</div>
+            <div style={{ border: "1px solid " + C.line, borderRadius: 12, padding: 10 }}><b>What do they do with it?</b><br />Act and get things done / Think and plan first</div>
+          </div>
+          <span style={{ fontSize: 12, color: C.sub }}>Check: do they usually ask When, How, What, or Why first? The Working With tab shows how your style and theirs tend to work together.</span>
+          <b style={{ ...label, color: C.ink, fontSize: 13 }}>Self-Management: going deeper</b>
+          <b style={{ fontSize: 16 }}>7. The four questions</b>
+          <div style={{ fontSize: 13, lineHeight: 1.6 }}>What do I want for myself? For the other person? For our relationship? For our team or organization?</div>
+          <b style={{ fontSize: 16 }}>8. Is there one thing you'd like to experiment with?</b>
+          <label htmlFor="exp" style={{ fontSize: 12, color: C.sub }}>Is it a reflection of who you are and who you want to be?</label>
+          <textarea id="exp" rows={2} placeholder="One thing I'll try" style={textarea} />
         </div>
       )}
-      {report?.error && <div style={{background:"#FEF2F2",border:"1px solid #FCA5A5",borderRadius:12,padding:14,fontSize:13,color:"#991B1B"}}>Could not generate report. Please try again.</div>}
+      <div style={{ background: C.soft, borderRadius: 14, padding: "12px 14px", fontSize: 13, lineHeight: 1.55, fontStyle: "italic" }}>Individual intent is not being questioned. Style explains behavior. It doesn't excuse it. Would another view help? A Jackalope can be a good person to talk it through with.</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Reports and Resources
+// ---------------------------------------------------------------------------
+function ReportsTab({ a }: any) {
+  return (
+    <div style={col(14)}>
+      <b style={{ fontSize: 20, color: C.ink }}>Reports</b>
+      <div style={{ border: "2px solid " + C.line, borderRadius: 16, padding: 18, ...col(10) }}>
+        <b style={{ fontSize: 16 }}>Your I-OPT Individual Report</b>
+        <span style={{ fontSize: 13, lineHeight: 1.55, color: C.sub }}>The full report from your session, the same one PeopleGro walked you through.</span>
+        <button disabled style={{ alignSelf: "flex-start", background: C.neutral, color: C.muted, border: "1px solid " + C.pillLine, borderRadius: 22, padding: "12px 18px", fontFamily: FONT, fontSize: 14 }}>Download my report (coming soon)</button>
+      </div>
+      <div style={card()}>
+        <b style={{ fontSize: 15 }}>Your summary</b>
+        <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Preferred style:</b> {a.isBal ? "No single preferred style" : a.top + ", " + STY[a.top as Code].name}</span>
+        <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Profile type:</b> {a.type}</span>
+        <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Pattern:</b> {a.pattern}</span>
+        <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Your question:</b> {STY[a.top as Code].q}</span>
+      </div>
     </div>
   );
 }
 
 function ResourcesTab() {
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [styleFilter, setStyleFilter] = useState("ALL");
-  const [search, setSearch] = useState("");
-
-  const filtered = RESOURCES.filter(r => {
-    const a = typeFilter==="all" || r.type===typeFilter;
-    const b = styleFilter==="ALL" || r.style===styleFilter || r.style==="ALL";
-    const c = !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.desc.toLowerCase().includes(search.toLowerCase());
-    return a && b && c;
-  });
-  const noFilter = typeFilter==="all" && styleFilter==="ALL" && !search;
-
-  const RCard = ({ r, featured=false }: any) => (
-    <div style={{background:"#fff",border:"1.5px solid "+(featured?G.greenBorder:G.border),borderRadius:14,padding:"12px 14px",marginBottom:8}}>
-      <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-        <div style={{width:36,height:36,borderRadius:10,background:TYPE_COLORS[r.type]+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{TYPE_ICONS[r.type]}</div>
-        <div style={{flex:1}}>
-          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap" as const,marginBottom:3}}>
-            <span style={{fontSize:10,fontWeight:"bold",color:TYPE_COLORS[r.type],textTransform:"uppercase" as const,letterSpacing:1}}>{r.type}</span>
-            {r.dur && <span style={{fontSize:10,color:"#94A3B8"}}>· {r.dur}</span>}
-            {r.style!=="ALL" && <span style={{fontSize:10,fontWeight:"bold",color:STYLES[r.style].color,background:STYLES[r.style].light,borderRadius:10,padding:"1px 7px",border:"1px solid "+STYLES[r.style].border}}>{r.style}</span>}
-            {featured && <span style={{fontSize:10,fontWeight:"bold",color:G.green}}>⭐</span>}
-          </div>
-          <p style={{fontSize:13,fontWeight:"bold",color:G.charcoal,margin:"0 0 3px",lineHeight:1.3}}>{r.title}</p>
-          <p style={{fontSize:11,color:G.charcoalLight,margin:"0 0 8px",lineHeight:1.5}}>{r.desc}</p>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <span style={{fontSize:10,color:"#94A3B8",background:"#F1F5F9",borderRadius:8,padding:"2px 8px"}}>{r.cat}</span>
-            <a href={r.url} target="_blank" rel="noopener noreferrer" style={{fontSize:11,fontWeight:"bold",color:G.green,textDecoration:"none",background:G.greenPale,border:"1px solid "+G.greenBorder,borderRadius:8,padding:"4px 10px"}}>{r.type==="pdf"?"Download":"Open"} →</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
+  const [open, setOpen] = useState("");
   return (
-    <div>
-      <div style={{background:"linear-gradient(135deg,"+G.greenPale+",#fff)",border:"1px solid "+G.greenBorder,borderRadius:16,padding:"14px 16px",marginBottom:14}}>
-        <p style={{fontSize:10,color:G.green,fontWeight:"bold",textTransform:"uppercase" as const,letterSpacing:2,margin:"0 0 4px"}}>PeopleGro Content Library</p>
-        <p style={{fontSize:13,color:G.charcoal,margin:0,lineHeight:1.5}}>Videos, guides, articles, and tools — all in one place.</p>
-      </div>
-      <div style={{position:"relative" as const,marginBottom:10}}>
-        <span style={{position:"absolute" as const,left:12,top:"50%",transform:"translateY(-50%)",fontSize:14,color:"#94A3B8"}}>🔍</span>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search resources…" style={{width:"100%",border:"1.5px solid "+G.border,borderRadius:12,padding:"10px 14px 10px 36px",fontSize:13,outline:"none",fontFamily:"Georgia,serif",boxSizing:"border-box" as const}}/>
-      </div>
-      <div style={{display:"flex",gap:6,marginBottom:10,overflowX:"auto" as const,paddingBottom:2}}>
-        {[["all","All"],["video","🎥 Video"],["pdf","📄 PDF"],["article","📝 Article"],["link","🔗 Link"]].map(([v,l]) => (
-          <button key={v} onClick={() => setTypeFilter(v)} style={{flexShrink:0,padding:"5px 12px",borderRadius:20,border:"1.5px solid "+(typeFilter===v?G.green:G.border),background:typeFilter===v?G.green:"#fff",color:typeFilter===v?"#fff":G.charcoal,fontSize:11,fontWeight:"bold",cursor:"pointer",fontFamily:"Georgia,serif"}}>{l}</button>
-        ))}
-      </div>
-      <div style={{display:"flex",gap:6,marginBottom:16}}>
-        {["ALL","RS","LP","RI","HA"].map(sf => (
-          <button key={sf} onClick={() => setStyleFilter(sf)} style={{flex:1,padding:"6px 4px",borderRadius:10,border:"1.5px solid "+(styleFilter===sf?(sf==="ALL"?G.green:STYLES[sf]?.color):G.border),background:styleFilter===sf?(sf==="ALL"?G.greenPale:STYLES[sf]?.light):"#fff",color:styleFilter===sf?(sf==="ALL"?G.green:STYLES[sf]?.color):G.charcoalLight,fontSize:11,fontWeight:"bold",cursor:"pointer",fontFamily:"Georgia,serif"}}>{sf==="ALL"?"All":sf}</button>
-        ))}
-      </div>
-      {noFilter && (
-        <div style={{marginBottom:16}}>
-          <p style={{fontSize:10,color:G.green,fontWeight:"bold",textTransform:"uppercase" as const,letterSpacing:2,margin:"0 0 10px"}}>⭐ Featured</p>
-          {RESOURCES.filter(r => r.star).map((r,i) => <RCard key={i} r={r} featured/>)}
-          <p style={{fontSize:10,color:"#94A3B8",textTransform:"uppercase" as const,letterSpacing:2,margin:"14px 0 10px"}}>All Resources</p>
-        </div>
-      )}
-      {!noFilter && <p style={{fontSize:11,color:G.charcoalLight,margin:"0 0 10px"}}>{filtered.length} resource{filtered.length!==1?"s":""} found</p>}
-      {filtered.map((r,i) => <RCard key={i} r={r}/>)}
-    </div>
-  );
-}
-
-function CoachTab({ profile, team, firstName }: any) {
-  const dom0 = dominant(profile), pat0 = getPattern(profile);
-  const greeting = "Hi " + firstName + "! I'm your PeopleGro Insights Coach. I know your I-OPT profile (" + dom0 + " dominant" + (pat0 ? ", " + pat0[0] + " pattern" : "") + ")" + (team.length>0 ? " and your team's profiles" : "") + ".\n\nWhat would you like to work on?";
-  const [messages, setMessages] = useState([{ role:"assistant", content:greeting }]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const bottomRef = useRef<any>(null);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages]);
-
-
-  const send = async () => {
-    if (!input.trim() || loading) return;
-    const msg = { role:"user", content:input.trim() };
-    const next = [...messages, msg];
-    setMessages(next); setInput(""); setLoading(true);
-    try {
-      const reply = await askClaude(next.slice(1).map(m => ({ role:m.role, content:m.content })));
-      setMessages(p => [...p,{ role:"assistant", content:reply || "Something went wrong. Try again." }]);
-    } catch(e:any) { setMessages(p => [...p,{ role:"assistant", content:e?.message || "Something went wrong. Try again." }]); }
-    setLoading(false);
-  };
-
-  const suggestions = [
-    "What does my " + (pat0 ? pat0[0] : "strategic") + " pattern mean day to day?",
-    ...team.slice(0,2).map((m:any) => "How do I work best with " + m.name + "?"),
-    "How should I communicate with my team?",
-    "What is my biggest blind spot?",
-  ];
-
-  return (
-    <div style={{display:"flex",flexDirection:"column" as const}}>
-      <div style={{overflowY:"auto" as const,maxHeight:340,minHeight:160,marginBottom:10}}>
-        {messages.map((m,i) => (
-          <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start",marginBottom:10}}>
-            {m.role==="assistant" && <div style={{width:26,height:26,borderRadius:13,background:G.green,color:"#fff",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginRight:8,marginTop:2}}>🪷</div>}
-            <div style={{maxWidth:"80%",padding:"10px 14px",borderRadius:m.role==="user"?"18px 18px 4px 18px":"18px 18px 18px 4px",background:m.role==="user"?G.charcoal:"#F1F5F9",color:m.role==="user"?"#fff":"#1E293B",fontSize:13,lineHeight:1.65,whiteSpace:"pre-line" as const}}>{m.content}</div>
+    <div style={col(14)}>
+      <b style={{ fontSize: 20, color: C.ink }}>PeopleGro Resources</b>
+      <span style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>Key PeopleGro concepts, tools, and videos from the classes. Tap any one to open it.</span>
+      {RESOURCES.map(r => {
+        const on = open === r.id;
+        return (
+          <div key={r.id} style={{ border: "1px solid " + C.line, borderRadius: 14, overflow: "hidden" }}>
+            <button onClick={() => setOpen(on ? "" : r.id)} aria-expanded={on} style={{ width: "100%", background: on ? C.neutral : "#FFFFFF", border: "none", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, textAlign: "left", cursor: "pointer", fontFamily: FONT, color: C.ink, minHeight: 56 }}>
+              <span style={col(3)}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}><b style={{ fontSize: 15 }}>{r.t}</b><span style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", border: "1px solid " + C.pillLine, borderRadius: 10, padding: "2px 7px", color: C.sub }}>{r.kind}</span></span>
+                <span style={{ fontSize: 12, color: C.muted, lineHeight: 1.4 }}>{r.d}</span>
+              </span>
+              <span style={{ fontSize: 12, whiteSpace: "nowrap", textDecoration: "underline" }}>{on ? "Close" : "Open"}</span>
+            </button>
+            {on && (
+              <div style={{ padding: "4px 16px 16px", ...col(10), fontSize: 13, lineHeight: 1.6 }}>
+                {(r.videos || []).map(v => (
+                  <div key={v.id} style={col(4)}>
+                    <div style={{ position: "relative", paddingTop: "56.25%", borderRadius: 10, overflow: "hidden", background: C.ink }}>
+                      <iframe src={"https://player.vimeo.com/video/" + v.id} title={v.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} />
+                    </div>
+                    <span style={{ fontSize: 12, color: C.sub }}>{v.title}{v.note ? " (" + v.note + ")" : ""}</span>
+                  </div>
+                ))}
+                {(r.imgs || []).map(im => <img key={im.src} src={im.src} alt={im.alt} style={{ width: "100%", maxWidth: 440, border: "1px solid " + C.line, borderRadius: 10, background: "#FFFFFF" }} />)}
+                {(r.paras || []).map(p => <p key={p} style={{ margin: 0 }}>{p}</p>)}
+                {(r.list || []).map(l => <div key={l} style={{ display: "flex", gap: 8 }}><span>•</span><span>{l}</span></div>)}
+                {(r.after || []).map(p => <p key={p} style={{ margin: 0 }}>{p}</p>)}
+                {(r.links || []).map(l => <a key={l.href} href={l.href} target="_blank" rel="noreferrer" style={{ alignSelf: "flex-start", background: C.ink, color: "#FFFFFF", borderRadius: 20, padding: "10px 16px", textDecoration: "none", fontSize: 13 }}>{l.text}</a>)}
+              </div>
+            )}
           </div>
-        ))}
-        {loading && <div style={{display:"flex",marginBottom:10}}><div style={{width:26,height:26,borderRadius:13,background:G.green,color:"#fff",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",marginRight:8}}>🪷</div><div style={{background:"#F1F5F9",borderRadius:"18px 18px 18px 4px",padding:"10px 14px",fontSize:13,color:"#94A3B8"}}>Thinking…</div></div>}
-        <div ref={bottomRef}/>
-      </div>
-      {messages.length===1 && (
-        <div style={{display:"flex",flexWrap:"wrap" as const,gap:6,marginBottom:10}}>
-          {suggestions.map(s => <button key={s} onClick={() => setInput(s)} style={{fontSize:10,border:"1.5px solid "+G.border,borderRadius:20,padding:"5px 10px",color:G.charcoal,background:"#fff",cursor:"pointer",fontFamily:"Georgia,serif"}}>{s}</button>)}
-        </div>
-      )}
-      <div style={{display:"flex",gap:8}}>
-        <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key==="Enter" && send()} placeholder="Ask your PeopleGro Insights coach…" style={{flex:1,border:"1.5px solid "+G.border,borderRadius:14,padding:"11px 14px",fontSize:13,outline:"none",fontFamily:"Georgia,serif"}}/>
-        <button onClick={send} disabled={loading||!input.trim()} style={{background:G.green,color:"#fff",border:"none",borderRadius:14,padding:"11px 18px",fontSize:14,fontWeight:"bold",cursor:"pointer",opacity:(!input.trim()||loading)?0.4:1}}>↑</button>
-      </div>
+        );
+      })}
     </div>
   );
 }
 
-function toProfile(r: IoptRow) {
-  return { RS:Number(r.rs), LP:Number(r.lp), RI:Number(r.ri), HA:Number(r.ha) };
-}
-
+// ---------------------------------------------------------------------------
+// Shell, sign-in, and app
+// ---------------------------------------------------------------------------
 const shell = (children: any) => (
-  <div style={{minHeight:"100vh",background:"#F0F4EE",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"20px 12px",fontFamily:"Georgia,'Times New Roman',serif"}}>
-    <div style={{width:"100%",maxWidth:520,background:"#fff",borderRadius:28,boxShadow:"0 16px 64px rgba(0,0,0,0.10)",overflow:"hidden"}}>{children}</div>
+  <div style={{ minHeight: "100vh", background: C.page, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 12px", fontFamily: FONT, color: C.text, boxSizing: "border-box" }}>
+    <div style={{ width: "100%", maxWidth: 520, background: "#FFFFFF", borderRadius: 28, boxShadow: "0 16px 64px rgba(0,0,0,0.10)", overflow: "hidden" }}>{children}</div>
   </div>
 );
+const footer = <div style={{ borderTop: "1px solid " + C.line, background: C.soft, padding: "10px 22px", fontSize: 11, color: C.muted, textAlign: "center" }}>© 2026 PeopleGro, LLC &amp; Professional Communications Inc</div>;
 
 function SignIn() {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle"|"sending"|"sent"|"error">("idle");
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [err, setErr] = useState("");
   const send = async () => {
     if (!email.trim()) return;
@@ -673,41 +771,45 @@ function SignIn() {
     if (error) { setStatus("error"); setErr(error.message); } else setStatus("sent");
   };
   return shell(
-    <div style={{padding:"28px 26px 32px"}}>
-      <Logo/>
-      <h2 style={{fontSize:20,color:G.charcoal,margin:"22px 0 6px"}}>Sign in</h2>
-      {status==="sent" ? (
-        <div style={{background:G.greenPale,border:"1px solid "+G.greenBorder,borderRadius:14,padding:"14px 16px",fontSize:13,color:G.charcoal,lineHeight:1.6}}>
-          Check your inbox. We sent a sign-in link to <strong>{email.trim()}</strong>. Open it on this device to continue.
-        </div>
-      ) : (
-        <>
-          <p style={{fontSize:13,color:G.charcoalLight,margin:"0 0 16px",lineHeight:1.6}}>Enter your work email and we'll send you a link. No password needed.</p>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key==="Enter" && send()} placeholder="you@company.com" style={{width:"100%",border:"1.5px solid "+G.border,borderRadius:12,padding:"12px 14px",fontSize:14,outline:"none",fontFamily:"Georgia,serif",boxSizing:"border-box" as const,marginBottom:10}}/>
-          <button onClick={send} disabled={status==="sending"} style={{width:"100%",padding:"13px",borderRadius:14,fontSize:14,fontWeight:"bold",background:status==="sending"?"#CBD5E1":G.green,color:"#fff",border:"none",cursor:"pointer",fontFamily:"Georgia,serif"}}>{status==="sending" ? "Sending…" : "Email me a sign-in link"}</button>
-          {status==="error" && <p style={{fontSize:12,color:"#991B1B",marginTop:10}}>{err}</p>}
-        </>
-      )}
-    </div>
+    <>
+      <div style={{ padding: "28px 26px 32px" }}>
+        <Logo />
+        <h2 style={{ fontSize: 20, color: C.ink, margin: "22px 0 6px" }}>Sign in</h2>
+        {status === "sent" ? (
+          <div style={{ background: C.neutral, borderRadius: 14, padding: "14px 16px", fontSize: 13, lineHeight: 1.6 }}>Check your inbox. We sent a sign-in link to <strong>{email.trim()}</strong>. Open it on this device to continue.</div>
+        ) : (
+          <>
+            <p style={{ fontSize: 13, color: C.sub, margin: "0 0 16px", lineHeight: 1.6 }}>Enter your work email and we'll send you a link. No password needed.</p>
+            <label htmlFor="email" style={{ fontSize: 12, color: C.sub }}>Email</label>
+            <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder="you@company.com" style={{ width: "100%", border: "1.5px solid " + C.line, borderRadius: 12, padding: "12px 14px", fontSize: 14, fontFamily: FONT, boxSizing: "border-box", margin: "4px 0 10px" }} />
+            <button onClick={send} disabled={status === "sending"} style={{ width: "100%", padding: 13, borderRadius: 14, fontSize: 14, fontWeight: "bold", background: status === "sending" ? "#9AA39C" : C.ink, color: "#FFFFFF", border: "none", cursor: "pointer", fontFamily: FONT }}>{status === "sending" ? "Sending…" : "Email me a sign-in link"}</button>
+            {status === "error" && <p style={{ fontSize: 12, color: "#991B1B", marginTop: 10 }}>{err}</p>}
+          </>
+        )}
+      </div>
+      {footer}
+    </>
   );
 }
 
 function Message({ title, body, onSignOut }: any) {
   return shell(
-    <div style={{padding:"28px 26px 32px"}}>
-      <Logo/>
-      <h2 style={{fontSize:18,color:G.charcoal,margin:"22px 0 8px"}}>{title}</h2>
-      <p style={{fontSize:13,color:G.charcoalLight,lineHeight:1.6,margin:"0 0 16px"}}>{body}</p>
-      {onSignOut && <button onClick={onSignOut} style={{background:"none",border:"1.5px solid "+G.border,borderRadius:12,padding:"8px 14px",fontSize:12,color:G.charcoal,cursor:"pointer",fontFamily:"Georgia,serif"}}>Sign out</button>}
+    <div style={{ padding: "28px 26px 32px" }}>
+      <Logo />
+      <h2 style={{ fontSize: 18, color: C.ink, margin: "22px 0 8px" }}>{title}</h2>
+      <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, margin: "0 0 16px" }}>{body}</p>
+      {onSignOut && <button onClick={onSignOut} style={{ background: "none", border: "1.5px solid " + C.line, borderRadius: 12, padding: "8px 14px", fontSize: 12, color: C.ink, cursor: "pointer", fontFamily: FONT }}>Sign out</button>}
     </div>
   );
 }
 
+const TABS = ["Profile", "Working With", "Practice", "Reports", "Resources", "Team", "Coach"];
+
 export default function App() {
   const [tab, setTab] = useState("Profile");
+  const [wwView, setWwView] = useState("see");
   const [session, setSession] = useState<any>(undefined);
   const [me, setMe] = useState<IoptRow | null | undefined>(undefined);
-  const [rows, setRows] = useState<IoptRow[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -717,62 +819,52 @@ export default function App() {
 
   const email = session?.user?.email?.toLowerCase();
   useEffect(() => {
-    if (!email) { setMe(undefined); setRows([]); return; }
+    if (!email) { setMe(undefined); return; }
     supabase.from("iopt_profiles").select("*").then(({ data }) => {
       const all = (data || []) as IoptRow[];
-      setRows(all);
-      setMe(all.find(r => r.email.toLowerCase()===email) || null);
+      setMe(all.find(r => r.email.toLowerCase() === email) || null);
     });
   }, [email]);
 
   const signOut = () => supabase.auth.signOut();
 
-  if (!supabaseConfigured) return <Message title="Setup needed" body="This app is not connected to its database yet. Add REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY in Vercel."/>;
-  if (session===undefined || (session && me===undefined)) return <Message title="Loading…" body="One moment."/>;
-  if (!session) return <SignIn/>;
-  if (me===null) return <Message title="No profile yet" body={"We couldn't find an I-OPT profile for " + email + ". If you've taken the assessment, contact your PeopleGro facilitator to get it added."} onSignOut={signOut}/>;
+  if (!supabaseConfigured) return <Message title="Setup needed" body="This app is not connected to its database yet. Add REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY in Vercel." />;
+  if (session === undefined || (session && me === undefined)) return <Message title="Loading…" body="One moment." />;
+  if (!session) return <SignIn />;
+  if (me === null) return <Message title="No profile yet" body={"We couldn't find an I-OPT profile for " + email + ". If you've taken the assessment, please contact your PeopleGro facilitator to get it added."} onSignOut={signOut} />;
 
-  const profile = toProfile(me!);
-  const team = rows.filter(r => r.email.toLowerCase()!==email && r.team===me!.team).map(r => ({
-    name: r.first_name, style: r.dominant, secondary: r.secondary, pattern: r.pattern, scores: toProfile(r),
-  }));
-  const dom = dominant(profile);
+  const sc: Record<Code, number> = { RS: Number(me!.rs), LP: Number(me!.lp), RI: Number(me!.ri), HA: Number(me!.ha) };
+  const a = analyze(sc);
+  const goTap = () => { setTab("Working With"); setWwView("tap"); };
 
   return shell(
     <>
-        {/* Header */}
-        <div style={{background:"#fff",padding:"16px 22px 14px",borderBottom:"2px solid "+G.greenBorder}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <Logo/>
-            <div style={{background:STYLES[dom].color,borderRadius:20,padding:"5px 12px",display:"flex",alignItems:"center",gap:5}}>
-              <span style={{color:"#fff",fontSize:12,fontWeight:"bold"}}>{dom}</span>
-              <span style={{color:"rgba(255,255,255,0.7)",fontSize:9}}>{STYLES[dom].label.split(" ")[0]}</span>
-            </div>
-          </div>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",margin:"7px 0 0"}}>
-            <p style={{color:G.charcoalLight,fontSize:10,margin:0,fontStyle:"italic"}}>{me!.first_name} · "{STYLES[dom].motto}" · Powered by I-OPT®</p>
-            <button onClick={signOut} style={{background:"none",border:"none",color:G.charcoalLight,fontSize:10,cursor:"pointer",textDecoration:"underline",fontFamily:"Georgia,serif",padding:0}}>Sign out</button>
-          </div>
+      <div style={{ padding: "16px 22px 12px", borderBottom: "2px solid #C4DFB0", ...col(6) }}>
+        <Logo />
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.muted }}>
+          <span style={{ fontStyle: "italic" }}>{me!.first_name}</span>
+          <button onClick={signOut} style={{ background: "none", border: "none", color: C.muted, fontSize: 11, cursor: "pointer", textDecoration: "underline", fontFamily: FONT, padding: 0 }}>Sign out</button>
         </div>
-
-        {/* Tabs */}
-        <div style={{display:"flex",borderBottom:"1px solid "+G.border,background:G.offWhite,overflowX:"auto" as const}}>
-          {TABS.map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{flex:1,padding:"10px 2px",fontSize:9,fontWeight:tab===t?"bold":"normal",color:tab===t?G.charcoal:G.charcoalLight,borderBottom:"2px solid "+(tab===t?G.green:"transparent"),background:"none",border:"none",cursor:"pointer",transition:"all 0.15s",fontFamily:"Georgia,serif",whiteSpace:"nowrap" as const}}>
-              <div style={{fontSize:12,marginBottom:1}}>{TAB_ICONS[t]}</div>{t}
+      </div>
+      <div style={{ display: "flex", borderBottom: "1px solid " + C.line, background: C.soft }}>
+        {TABS.map(t => {
+          const dis = t === "Team" || t === "Coach"; const on = tab === t;
+          return (
+            <button key={t} disabled={dis} onClick={() => !dis && setTab(t)} style={{ flex: "1 1 0", minWidth: 0, padding: "10px 2px", minHeight: 48, fontFamily: FONT, fontSize: 11, lineHeight: 1.2, background: dis ? "#EEF0EE" : "none", border: "none", borderBottom: "3px solid " + (on ? C.ink : "transparent"), color: dis ? "#5C655E" : on ? C.text : C.muted, fontWeight: on ? "bold" : "normal", cursor: dis ? "not-allowed" : "pointer" }}>
+              <span style={{ display: "block" }}>{t}</span>
+              {dis && <span style={{ display: "block", fontSize: 9, letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>Coming soon</span>}
             </button>
-          ))}
-        </div>
-
-        {/* Content */}
-        <div style={{padding:"20px 20px 24px",overflowY:"auto" as const,maxHeight:"75vh"}}>
-          {tab==="Profile" && <ProfileTab profile={profile}/>}
-          {tab==="Team" && <TeamTab profile={profile} team={team} teamName={me!.team}/>}
-          {tab==="Patterns" && <PatternsTab profile={profile} team={team}/>}
-          {tab==="Reports" && <ReportsTab profile={profile} team={team}/>}
-          {tab==="Resources" && <ResourcesTab/>}
-          {tab==="Coach" && <CoachTab profile={profile} team={team} firstName={me!.first_name}/>}
-        </div>
+          );
+        })}
+      </div>
+      <div style={{ padding: "20px 22px 28px" }}>
+        {tab === "Profile" && <ProfileTab sc={sc} a={a} goTap={goTap} />}
+        {tab === "Working With" && <WorkingWithTab a={a} view={wwView} setView={setWwView} />}
+        {tab === "Practice" && <PracticeTab />}
+        {tab === "Reports" && <ReportsTab a={a} />}
+        {tab === "Resources" && <ResourcesTab />}
+      </div>
+      {footer}
     </>
   );
 }
