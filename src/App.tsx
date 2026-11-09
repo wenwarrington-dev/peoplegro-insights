@@ -165,8 +165,20 @@ const STUCK: [string, string][] = [
   ["Us vs. them", "Am I seeing this as us vs. them, right vs. wrong, or win vs. lose?"],
 ];
 
-type Res = { id: string; t: string; kind: string; d: string; imgs?: { src: string; alt: string }[]; videos?: { id: string; title: string; note?: string }[]; paras?: string[]; list?: string[]; after?: string[]; links?: { href: string; text: string }[] };
+type Res = { id: string; t: string; kind: string; group?: string; d: string; imgs?: { src: string; alt: string }[]; videos?: { id: string; title: string; note?: string }[]; paras?: string[]; list?: string[]; after?: string[]; links?: { href: string; text: string }[] };
 const RESOURCES: Res[] = [
+  { id: "recap-intro", group: "Class recaps", t: "Intro to I-OPT", kind: "Class recap", d: "The PeopleGro Model, friction, perception, and the four I-OPT styles.",
+    paras: ["A quick refresher on the Intro class."],
+    list: ["The PeopleGro Model: how matters. Self-awareness and self-management elevate everything else, which is why they sit at the center of the lotus.", "Silos and friction are natural. The goal is to embrace, reduce, and manage friction through learning, not to eliminate it.", "We perceive things differently, and at different speeds. Our emotional state affects how we perceive, all the time. So do sleep, hydration, nutrition, movement, and mindful practice.", "The Jackalope: someone who shows up with wisdom, courage, and compassion. Everyone can be one, and everyone sometimes needs one.", "Communication: you're 100% responsible for your content, your nonverbals, your reaction, and noticing feedback.", "The four I-OPT styles, RS, LP, HA, and RI, each with its own gift to the team.", "We judge ourselves by our intent and others by their behavior, and that gap affects trust."],
+    after: ["Being human is complex. Curiosity, empathy, and practice help, and so does being a Jackalope for others."] },
+  { id: "recap-stories", group: "Class recaps", t: "The Stories We Tell Ourselves", kind: "Class recap", d: "Friction, the feedback loop, mental models, and listening.",
+    paras: ["A quick refresher on The Stories We Tell Ourselves."],
+    list: ["We're the star of our own story, and our stories can become outdated. It helps to revisit them.", "The cost of friction shows up in energy, morale, the customer experience, and company health.", "The basic communication model and the feedback loop: behavior, emotions, and feelings. We react to our own interpretations, not just to someone else's behavior.", "Emotions are physical. Asking a question or 4-square breathing can help reset.", "Rightness blindness, and the Cascade Model: interactions escalate quickly and are hard to bring back to zero.", "Mental models, the reinforcing loop, the competency trap, and the 14 places we get stuck.", "The 5 levels of listening.", "Five strategies for self-awareness and self-management, ending with the four questions for any conversation."],
+    after: ["No one is broken. Everyone is evolving, and change is possible through practice. The Practice tab walks you through this step by step."] },
+  { id: "recap-change", group: "Class recaps", t: "Change Leadership & Neuroscience", kind: "Class recap", d: "How change feels, how the brain responds, and how to lead yourself and others through it.",
+    paras: ["A quick refresher on Change Leadership & Neuroscience."],
+    list: ["Change is personal and emotional. The change model moves through the Known, the Stop, the Shift, and the Resume.", "Intellectual acceptance usually comes before emotional acceptance. Resisting tends to make the discomfort last longer.", "The brain is wired for predictability, so change can trigger fight, flight, freeze, faint, or fawn.", "Three survival skills: learn how to learn, how to relate, and how to decide. Neuroplasticity means practice builds new pathways.", "Every style helps somewhere on the S-curve. RS creates momentum, LP operationalizes, HA sees the whole system, and RI finds creative, mission-driven solutions.", "The 4 D's, the universal strategies, and Clarify, Share, Engage.", "Change leadership vs. change management, and the hot, warm, and cold zones of leadership."],
+    after: ["A personal practice: choose a change, take the PeopleGro Change Assessment, notice your D and your story, find a Jackalope, and be one for others. The Change view on your Profile has these tools."] },
   { id: "model", t: "The PeopleGro Model", kind: "Guide", d: "Three buckets for satisfaction and success, and the lotus that ties them together.",
     imgs: [{ src: "/images/peoplegro-model.jpg", alt: "The PeopleGro Model: self-awareness and self-management, results and productivity, and technical and operational, leading to satisfaction and success" }, { src: "/images/peoplegro-model-lotus.jpg", alt: "The integrated PeopleGro Model as a lotus, with self-awareness and self-management at the center, results and productivity on the left, and technical and operational on the right" }],
     paras: ["The PeopleGro Model works in every part of life: at work, at home, and as a volunteer. You define what satisfaction and success mean for you. No one else should define that for you.", "There are three buckets. Two are about what we do, and one is about how we do it."],
@@ -487,6 +499,12 @@ function Behavior({ a }: any) {
         <span>The bigger the difference between your profile and someone else's, the more intense the reaction can be. And the stronger your preferred style, the stronger your response may be.</span>
         <span>Doing things your way over time proves it works, so it starts to feel like the right way. PeopleGro calls this rightness blindness.</span>
       </div>
+      <div style={{ ...card("transparent", C.neutral), fontSize: 13, lineHeight: 1.55 }}>
+        <b>Intent and behavior</b>
+        <span>"While we tend to judge ourselves by our intent, we tend to judge others by their behavior. Our perception of intent has a huge impact on trust."</span>
+        <span style={{ fontSize: 11, color: C.muted }}>Stephen M.R. Covey, The Speed of Trust</span>
+        <span>Others can only see your behavior, not your intent. When the two don't line up, trust can take the hit.</span>
+      </div>
       <p style={{ ...p13, fontStyle: "italic", color: C.sub }}>Which of these words would the people you work with use to describe you this week?</p>
     </div>
   );
@@ -514,6 +532,11 @@ function Change({ a }: any) {
         <span><b>You bring:</b> {me.changeBring}</span>
         <span><b>Your pattern ({a.pattern}):</b> {PCHANGE[a.pattern] || "You may draw on different patterns depending on the change."}</span>
       </div>
+      <div style={{ ...card("transparent", C.soft), fontSize: 13, lineHeight: 1.55 }}>
+        <b>Understanding a change vs. accepting it</b>
+        <span>PeopleGro's change model moves through the Known, the Stop, the Shift, and the Resume. Most of the leverage is in the Shift.</span>
+        <span>Intellectual acceptance, understanding the change logically, usually comes first. Emotional acceptance takes longer, and it's where most people lose energy. Resisting a change tends to make the discomfort last longer.</span>
+      </div>
       <span style={label}>Common reactions to change: the 4 D's</span>
       {DEES.map(d => (
         <div key={d.name} style={{ ...card(), fontSize: 12, lineHeight: 1.5, gap: 3 }}>
@@ -524,6 +547,14 @@ function Change({ a }: any) {
         </div>
       ))}
       <span style={{ fontSize: 11, color: C.muted }}>The 4 D's come from Aftershock: Helping People Through Corporate Change, by Woodward and Buchholz.</span>
+      <div style={{ ...card(), fontSize: 13, lineHeight: 1.55 }}>
+        <b>Helping others through change</b>
+        <span>Three moves that can help when someone is in a D:</span>
+        <span><b>Clarify:</b> understanding what they feel they've lost and what they want.</span>
+        <span><b>Share:</b> talking about the possible gains and the purpose of the change.</span>
+        <span><b>Engage:</b> inviting their involvement, agreement, and commitment.</span>
+        <span>People in change often want to be seen and understood. Telling them what to do, avoiding them, or going into cheerleader mode usually doesn't help.</span>
+      </div>
       <div style={{ border: "1px solid " + C.pillLine, borderRadius: 16, padding: 16, ...col(12) }}>
         <b style={{ fontSize: 16 }}>PeopleGro Change Assessment</b>
         <label htmlFor="chg" style={{ fontSize: 13, color: C.sub }}>Think of a change you're going through right now.</label>
@@ -671,7 +702,15 @@ function PracticeTab() {
       {banner("Self-Awareness", "Notice what happened, how you reacted, and the story you're telling.")}
       {step("q1", 1, "What was the behavior?", "What did they actually do or say? Stick to what a camera would have caught.")}
       {step("q2", 2, "What was your reaction?", "What did you notice in your body? Your body is an early warning system.")}
+      <div style={{ ...card("transparent", C.soft), fontSize: 13, lineHeight: 1.55 }}>
+        <b>Your capacity matters</b>
+        <span>Sleep, hydration, nutrition, movement, and mindful practice all affect how we perceive things and how strongly we react. When one of these is running low, you might notice your reactions are bigger than usual. It can help to check in on them too.</span>
+      </div>
       {step("q3", 3, "What story are you telling yourself?", "What did you decide their behavior meant, about them, you, or the situation?")}
+      <div style={{ ...card("transparent", C.soft), fontSize: 13, lineHeight: 1.55 }}>
+        <b>Why it helps to catch the story early</b>
+        <span>PeopleGro's Cascade Model shows how interactions can escalate quickly as misunderstandings build on each other. Once that happens, it's hard to get back to zero. Noticing the story early gives you more choices about what comes next.</span>
+      </div>
       {banner("Self-Management", "Choose what you'll do next.")}
       {step("q4", 4, "What's one thing you could explore doing differently?", "Small is fine.")}
       {!deeper && <button onClick={() => setDeeper(true)} style={{ alignSelf: "flex-start", background: "#FFFFFF", color: C.ink, border: "2px solid " + C.ink, borderRadius: 22, padding: "11px 18px", fontFamily: FONT, fontSize: 14, cursor: "pointer" }}>Does this keep happening? Go deeper</button>}
@@ -747,10 +786,14 @@ function ResourcesTab() {
     <div style={col(14)}>
       <b style={{ fontSize: 20, color: C.ink }}>PeopleGro Resources</b>
       <span style={{ fontSize: 13, color: C.sub, lineHeight: 1.5 }}>Key PeopleGro concepts, tools, and videos from the classes. Tap any one to open it.</span>
-      {RESOURCES.map(r => {
+      {RESOURCES.map((r, i) => {
         const on = open === r.id;
+        const g = r.group || "Concepts, tools, and videos";
+        const prev = i > 0 ? (RESOURCES[i - 1].group || "Concepts, tools, and videos") : "";
         return (
-          <div key={r.id} style={{ border: "1px solid " + C.line, borderRadius: 14, overflow: "hidden" }}>
+          <div key={r.id} style={col(8)}>
+          {g !== prev && <span style={{ ...label, marginTop: i > 0 ? 8 : 0 }}>{g}</span>}
+          <div style={{ border: "1px solid " + C.line, borderRadius: 14, overflow: "hidden" }}>
             <button onClick={() => setOpen(on ? "" : r.id)} aria-expanded={on} style={{ width: "100%", background: on ? C.neutral : "#FFFFFF", border: "none", padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, textAlign: "left", cursor: "pointer", fontFamily: FONT, color: C.ink, minHeight: 56 }}>
               <span style={col(3)}>
                 <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}><b style={{ fontSize: 15 }}>{r.t}</b><span style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", border: "1px solid " + C.pillLine, borderRadius: 10, padding: "2px 7px", color: C.sub }}>{r.kind}</span></span>
@@ -775,6 +818,7 @@ function ResourcesTab() {
                 {(r.links || []).map(l => <a key={l.href} href={l.href} target="_blank" rel="noreferrer" style={{ alignSelf: "flex-start", background: C.ink, color: "#FFFFFF", borderRadius: 20, padding: "10px 16px", textDecoration: "none", fontSize: 13 }}>{l.text}</a>)}
               </div>
             )}
+          </div>
           </div>
         );
       })}
