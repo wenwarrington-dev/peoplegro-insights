@@ -11,7 +11,9 @@ const C = {
 const FONT = "Georgia, 'Times New Roman', serif";
 
 type Code = "RS" | "LP" | "RI" | "HA";
-const ORDER: Code[] = ["RS", "LP", "RI", "HA"];
+const ORDER: Code[] = ["RS", "LP", "HA", "RI"];
+// Adds a closing period to a sentence or list item if it's missing.
+const dot = (s: string) => (/[.!?"”')]$/.test(s.trim()) ? s : s + ".");
 
 // ---------------------------------------------------------------------------
 // Content (matches PeopleGro Insights Copy Draft v1)
@@ -93,48 +95,50 @@ const STY: Record<Code, any> = {
 
 const PAT: Record<string, string> = { "RI+RS": "Changer", "RS+RI": "Changer", "RS+LP": "Performer", "LP+RS": "Performer", "LP+HA": "Conservator", "HA+LP": "Conservator", "HA+RI": "Perfector", "RI+HA": "Perfector" };
 const OPP: Record<Code, Code> = { RS: "HA", HA: "RS", RI: "LP", LP: "RI" };
-const PCHANGE: Record<string, string> = {
-  Changer: "You measure success by the overall change, and turn a stream of ideas into action.",
-  Performer: "You tend to accept change and are eager to show results.",
-  Conservator: "Focusing on the short-term goals of the change can help reduce your discomfort.",
-  Perfector: "You work on turning raw ideas into finished concepts.",
+// From the "Moving From Styles to Patterns" slide
+const PCHANGE: Record<string, { focus: string; text: string }> = {
+  Performer: { focus: "action", text: "This pattern is focused on action. You tend to accept change, and you're eager to post results." },
+  Conservator: { focus: "structure", text: "This pattern is focused on structure. A good strategy can be to focus on the short-term goals of the change, which can help reduce your discomfort." },
+  Perfector: { focus: "thought", text: "This pattern centers on thought. Your change focus is to perfect raw ideas into finished concepts." },
+  Changer: { focus: "unpatterned input", text: "This pattern centers on unpatterned input. You measure success by the overall change, and you generate a stream of ideas and translate them into action." },
 };
 
 const PATTERNS = [
-  { name: "Changer", combo: "RI + RS", share: 21, desc: "Comes up with new ideas and starts acting on them quickly. Creative, agile, optimistic.", watch: "Moving faster than the team can follow." },
   { name: "Performer", combo: "RS + LP", share: 14, desc: "Focused on the task and the result. Quick, reliable decisions.", watch: "Trading long-term thinking for immediate results." },
   { name: "Conservator", combo: "LP + HA", share: 46, desc: "Careful, detailed, and skeptical of new situations. Consistent, quality work.", watch: "Resisting change even when it's needed." },
   { name: "Perfector", combo: "HA + RI", share: 19, desc: "Values new ideas but shares them after thinking through risk and reward.", watch: "Taking a long time to reach a conclusion." },
+  { name: "Changer", combo: "RI + RS", share: 21, desc: "Comes up with new ideas and starts acting on them quickly. Creative, agile, optimistic.", watch: "Moving faster than the team can follow." },
 ];
 const PATTERN_TIPS = [
-  { name: "Changer", combo: "RI + RS", tip: "Energy and the big idea, then help choosing what to act on first." },
   { name: "Performer", combo: "RS + LP", tip: "Clarity about the task, the result, and the deadline." },
   { name: "Conservator", combo: "LP + HA", tip: "Time, detail, and evidence, and seeing that the risks were considered." },
   { name: "Perfector", combo: "HA + RI", tip: "Hearing the idea early, with room to think it through." },
+  { name: "Changer", combo: "RI + RS", tip: "Energy and the big idea, then help choosing what to act on first." },
 ];
-const PAIRS: [string, string][] = [
-  ["RS + LP", "Good working relationship. RS can frustrate LP by acting without a plan. LP can frustrate RS by being slow."],
-  ["RS + HA", "Can work very well. HA helps with goals and options, RS makes ideas real."],
-  ["RS + RI", "Lots of energy and ideas. May need an LP or HA to add structure."],
-  ["LP + HA", "Natural fit. HA plans and assesses, LP executes."],
-  ["LP + RI", "Can work well with effort. RI's constant new ideas can feel threatening to LP."],
-  ["HA + RI", "Very good fit when both understand the dynamic. May need an RS or LP to get to action."],
-  ["RS + RS", "Fast and energized, but both may push their own direction. Agree on what moving forward means."],
-  ["LP + LP", "Friction can come from each protecting their own process."],
-  ["RI + RI", "Can turn into a better-idea competition. You may not see the mission the same way."],
-  ["HA + HA", "Each has their own vetted information. Common ground on the facts can help."],
+// [pair, how it tends to work, possible friction points]
+const PAIRS: [string, string, string][] = [
+  ["RS + LP", "Good working relationship. RS can frustrate LP by acting without a plan. LP can frustrate RS by being slow.", "Deadlines, last-minute changes of direction, and starting before the steps are clear."],
+  ["RS + HA", "These are opposite styles, so working together doesn't come easily. They see time, detail, and risk very differently. When working together, remember that slower is faster. HA can help with goals and options, and RS can help HA get forward movement.", "RS may see HA's questions as stalling. HA may see RS as moving before anyone understands why. Pace and how much analysis is enough can become flashpoints."],
+  ["RS + RI", "Lots of energy and ideas. May need an LP or HA to add structure.", "Lots of starts and fewer finishes. Details and follow-through can fall through the cracks, and others may struggle to keep up."],
+  ["LP + HA", "Natural fit. HA plans and assesses, LP executes.", "Both can wait for more certainty and miss a window. HA's what-ifs can reopen a plan LP considers settled."],
+  ["LP + RI", "These are opposite styles, so working together takes effort. RI's constant new ideas can feel threatening to LP, and LP's process can feel limiting to RI.", "Changes in the middle of a project, skipping steps, and \"good enough\" vs. \"done right.\" LP's how questions can feel to RI like shooting the idea down."],
+  ["HA + RI", "Very good fit when both understand the dynamic. May need an RS or LP to get to action.", "Lots of thinking and ideas, slower to act. RI may feel HA is picking ideas apart. HA may feel RI is skipping the risks."],
+  ["RS + RS", "Fast and energized, but both may push their own direction. Agree on what moving forward means.", "Competing for the lead and moving fast in different directions."],
+  ["LP + LP", "Friction can come from each protecting their own process.", "Disagreements about the right way to do it, and whose procedure wins."],
+  ["HA + HA", "Each has their own vetted information. Common ground on the facts can help.", "Long debates over whose analysis is right, and decisions that keep getting pushed back."],
+  ["RI + RI", "Can turn into a better-idea competition. You may not see the mission the same way.", "Each idea gets topped by a newer one, and none of them get finished."],
 ];
 const TO: Record<Code, Record<Code, string>> = {
-  RS: { RS: "It can help to agree on what moving forward means right now.", LP: "It can help to be specific and logical, and show how it fits what they already trust.", HA: "Questions are likely. It can help to show your thought path and the big picture.", RI: "It can help to keep it focused, use analogies, and connect it to the mission." },
-  LP: { RS: "It can help to keep it short and action-focused, with some energy.", HA: "Challenge is likely, and it isn't about your competence. It can help to show the big picture.", RI: "It can help to connect it to the mission and use analogies, and to be ready for deep dives.", LP: "It can help to respect each other's structure and look for common ground." },
-  RI: { RS: "It can help to lead with energy and the action, and keep it short and prioritized.", LP: "It can help to slow down, give more detail than feels natural, and walk through your logic.", HA: "It can help to lay out your reasoning and the big picture, and give them time to think.", RI: "It can help to skip the better-idea competition and give them something to react to." },
-  HA: { RS: "It can help to cover the essentials quickly and build some enthusiasm.", LP: "It can help to be clear and logical, and tie new information to how the work gets done.", RI: "It can help to keep it focused and use comparisons.", HA: "It can help to explain your logic path and look for common ground on the facts." },
+  RS: { RS: "It can help to agree on what moving forward means right now.", LP: "It can help to be specific and logical, and show how it fits what they already trust. Spell out the steps in order, who does what, the timeline, and what stays the same. Put it in writing, and give them time to review before you ask for a decision.", HA: "Questions are likely. It can help to show your thought path and the big picture.", RI: "It can help to keep it focused, use analogies, and connect it to the mission." },
+  LP: { RS: "It can help to keep it short and action-focused, with some energy.", LP: "It can help to respect each other's structure and look for common ground. Agree on the steps, the standards, and who owns which part before you start.", HA: "Challenge is likely, and it isn't about your competence. It can help to show the big picture.", RI: "It can help to connect it to the mission and use analogies, and to be ready for deep dives." },
+  HA: { RS: "It can help to cover the essentials quickly and build some enthusiasm.", LP: "It can help to be clear and logical, and tie new information to how the work gets done. Walk through the steps, the timeline, the resources, and how it connects to current procedures, so they can see how it will work day to day.", HA: "It can help to explain your logic path and look for common ground on the facts.", RI: "It can help to keep it focused and use comparisons." },
+  RI: { RS: "It can help to lead with energy and the action, and keep it short and prioritized.", LP: "It can help to slow down, give more detail than feels natural, and walk through your logic. Lay out the steps in order, what changes in their day-to-day work, and how you'll test it before rolling it out. A pilot or beta test can help build their trust.", HA: "It can help to lay out your reasoning and the big picture, and give them time to think.", RI: "It can help to skip the better-idea competition and give them something to react to." },
 };
 const DEES = [
-  { name: "Disengagement", looks: "Hard to find, doing only the basics, no questions", hear: "\"I don't care.\" \"Whatever you want.\"", helps: "Making the first move, creating safety, asking questions, and listening." },
-  { name: "Disidentification", looks: "Dwelling on the past, sticking with the old team", hear: "\"It wasn't broken, why change it?\" \"I used to...\"", helps: "Exploring what mattered most before, and what the change might offer." },
-  { name: "Disorientation", looks: "Endless questions, frozen by fear of doing it wrong, very busy", hear: "\"Not sure where to start.\"", helps: "A big-picture framework and a plan with clear priorities." },
-  { name: "Disenchantment", looks: "Raised voice, walking out, malicious compliance", hear: "\"I can't believe this is happening.\"", helps: "Recognizing that anger often masks another D, and room to vent respectfully. Acknowledging isn't agreeing." },
+  { name: "Disengagement", def: "Pulling back from the change. Low energy and minimal participation, often compliance without commitment.", example: "After a reorganization, a team member who used to speak up in every meeting now does only what's asked and stops offering ideas.", looks: "Hard to find, doing only the basics, no questions", hear: "\"I don't care.\" \"Whatever you want.\"", helps: "Making the first move, creating safety, asking questions, and listening." },
+  { name: "Disidentification", def: "A sense of lost identity. The change takes away part of how someone saw themselves at work.", example: "A manager whose expertise was the old system keeps saying, \"I used to be the person everyone came to for this,\" and still does things the old way when they can.", looks: "Dwelling on the past, sticking with the old team", hear: "\"It wasn't broken, why change it?\" \"I used to...\"", helps: "Exploring what mattered most before, and what the change might offer." },
+  { name: "Disorientation", def: "Confusion about new roles, priorities, and expectations. People feel lost and keep looking for clarity.", example: "After a new process rolls out, someone asks the same questions in every meeting, stays very busy, and avoids starting anything for fear of doing it wrong.", looks: "Endless questions, frozen by fear of doing it wrong, very busy", hear: "\"Not sure where to start.\"", helps: "A big-picture framework and a plan with clear priorities." },
+  { name: "Disenchantment", def: "Anger and negativity toward the change. It can show up as open hostility or persistent complaints.", example: "When a policy changes without their input, a long-time employee raises their voice in a meeting, then complies on paper while quietly working around it.", looks: "Raised voice, walking out, malicious compliance", hear: "\"I can't believe this is happening.\"", helps: "Recognizing that anger often masks another D, and room to vent respectfully. Acknowledging isn't agreeing." },
 ];
 const ASSESS: [string, string][] = [
   ["I already miss the old days", "The future is bright"], ["I feel unsure, or even stuck", "I know what to do"], ["A loss", "A gain"],
@@ -148,21 +152,22 @@ const LEVELS = [
   ["Rebuttal", "Focused on your response, getting ready to argue"],
   ["Gist", "Tuning in and out, checking it against your own logic"],
 ];
-const STUCK: [string, string][] = [
-  ["All or nothing", "What's beyond the black and white I'm seeing? Is there an \"and\" instead of an \"or\"?"],
-  ["Overgeneralizing", "Am I projecting one past event onto this situation?"],
-  ["Emotional filtering", "Am I seeing only the positives or only the negatives?"],
-  ["Downplaying the positive", "Am I brushing off real compliments?"],
-  ["Jumping to conclusions", "Am I mind reading with no evidence? What don't I know?"],
-  ["Magnifying or minimizing", "Am I blowing this out of proportion, or downplaying something that matters?"],
-  ["Storytelling as truth", "What story am I telling myself? Can I trade up for a better story?"],
-  ["Critical statements", "Am I using should, must, have to, or can't?"],
-  ["I am what I think", "Am I reasoning from a feeling?"],
-  ["Labeling", "Am I labeling myself or others based on a mistake?"],
-  ["Blaming", "Am I blaming myself for more than my share, or missing my part?"],
-  ["Unspoken expectations", "How would they know what I wanted?"],
-  ["Processing style", "Are different, or similar, processing styles at play?"],
-  ["Us vs. them", "Am I seeing this as us vs. them, right vs. wrong, or win vs. lose?"],
+// [mental model, definition, questions to get unstuck]
+const STUCK: [string, string, string[]][] = [
+  ["All or nothing", "Seeing a situation in black-and-white terms, with no middle ground.", ["What's beyond the black and white I'm seeing?", "Is there an \"and\" instead of an \"or\"?", "What would a middle option look like?"]],
+  ["Overgeneralizing", "Applying one past experience to a new situation that may be different.", ["Am I projecting one past event onto this situation?", "What's different about this time?", "Do I have more than one example?"]],
+  ["Emotional filtering", "Seeing only the positives or only the negatives.", ["Am I seeing only the positives or only the negatives?", "What am I leaving out?", "How might someone else describe this?"]],
+  ["Downplaying the positive", "Brushing off compliments, wins, or strengths.", ["Am I brushing off real compliments?", "What would I say if a friend had done this?", "What part of this did go well?"]],
+  ["Jumping to conclusions", "Assuming what others think or intend, without evidence.", ["Am I mind reading with no evidence?", "What don't I know?", "What question could I ask instead?"]],
+  ["Magnifying or minimizing", "Making something bigger, or smaller, than it is.", ["Am I blowing this out of proportion, or downplaying something that matters?", "How much will this matter in a week? In a year?", "What would a neutral observer say?"]],
+  ["Storytelling as truth", "Believing the story we tell ourselves without questioning it.", ["What story am I telling myself?", "What would a camera have caught?", "Can I trade up for a better story?"]],
+  ["Critical statements", "Using should, must, have to, or can't, which adds pressure and judgment.", ["Am I using should, must, have to, or can't?", "What changes if I say \"could\" instead?", "Whose rule is this?"]],
+  ["I am what I think", "Treating a feeling or thought as a fact about who you are.", ["Am I reasoning from a feeling?", "Is this a thought or a fact?", "What would I tell someone else who felt this way?"]],
+  ["Labeling", "Defining yourself or others by one mistake or shortcoming.", ["Am I labeling myself or others based on a mistake?", "What else is true about this person, or about me?", "Can I describe the behavior instead of the person?"]],
+  ["Blaming", "Assigning fault without the full context.", ["Am I blaming myself for more than my share, or missing my part?", "What else contributed?", "What's within my control here?"]],
+  ["Unspoken expectations", "Assuming others know what you need without saying it.", ["How would they know what I wanted?", "Did I say it out loud, or only think it?", "What would I ask for if I said it clearly?"]],
+  ["Processing style", "Overlooking how different processing styles shape what each person hears and needs.", ["Are different, or similar, processing styles at play?", "What question would their style ask first?", "What might they need that I don't?"]],
+  ["Us vs. them", "Seeing a situation as us vs. them, right vs. wrong, or win vs. lose.", ["Am I seeing this as us vs. them?", "What do we have in common?", "What would a win for both of us look like?"]],
 ];
 
 type Res = { id: string; t: string; kind: string; group?: string; d: string; imgs?: { src: string; alt: string }[]; videos?: { id: string; title: string; note?: string }[]; paras?: string[]; list?: string[]; after?: string[]; links?: { href: string; text: string }[] };
@@ -217,30 +222,35 @@ const RESOURCES: Res[] = [
 function analyze(sc: Record<Code, number>) {
   const sorted = ORDER.slice().sort((a, b) => sc[b] - sc[a]);
   const [top, second, third] = sorted;
-  const [s1, s2, s3, s4] = sorted.map(c => sc[c]);
-  let pattern = PAT[top + "+" + second] || PAT[top + "+" + third] || "None";
-  let type: string, moment: string, overTime: string, msg: string;
+  const [s1, s2] = sorted.map(c => sc[c]);
+  let pattern = PAT[top + "+" + second] || "No single pattern";
+  let type = "", moment: string, overTime: string, momentWhy: string, overTimeWhy: string, msg = "";
   const balanced = ORDER.every(c => sc[c] >= 12 && sc[c] <= 13);
+  const split = OPP[top] === second;
+  // "Close" is a judgment call for the in-the-moment explanation only. It isn't shown as a rule.
+  const close = s1 - s2 <= 5;
+  const focus = PCHANGE[pattern] ? PCHANGE[pattern].focus : "";
   if (balanced) {
-    type = "Balanced"; moment = "Less predictable"; overTime = "Less predictable"; pattern = "No single pattern";
-    msg = "Your four scores are about equal. You have no single preferred style and no single pattern, so you can draw on every style. The trade-off is that others may find you harder to anticipate. Naming what you need, and which style you're bringing to a situation, helps people work with you. Balanced profiles are rare. In PCI's experience, they often show up during a major shift in someone's life, and they usually don't stay balanced.";
-  } else if (s1 - s2 <= 5 && OPP[top] === second && Math.abs(s3 - s4) <= 1) {
-    type = "Balanced split"; moment = "Less predictable"; overTime = "Less predictable"; pattern = "No single pattern";
-    msg = "Your top two styles, " + top + " and " + second + ", are close and sit on opposite sides of the I-OPT model, and your other two are about equal. There's no single preferred style and no single pattern leading the way. You bring a wide range, and others may find you harder to anticipate. It helps to tell people which style you're working from.";
-  } else if (s1 - s2 <= 5) {
-    type = "Split style"; moment = "Less predictable"; overTime = "Predictable";
-    msg = "Your top two scores, " + top + " and " + second + ", are within 5 points of each other. That's called a split style. In any given moment, you might respond from either one, so people may find you harder to read day to day. Over time, though, your " + pattern + " pattern is clear and consistent. For you, your pattern often describes you better than either style on its own.";
-  } else if (s2 - s3 <= 5) {
-    const p1 = PAT[top + "+" + second], p2 = PAT[top + "+" + third];
-    pattern = [p1, p2].filter(Boolean).join(" / ") || "None";
-    type = "Split pattern"; moment = "Predictable"; overTime = "Less predictable";
-    msg = "Your " + top + " preferred style is clear, so people can usually predict your first response. Your next two styles, " + second + " and " + third + ", are within 5 points, so over time you may move between two patterns" + (p1 && p2 ? ": " + p1 + " and " + p2 : "") + ". People may see you as consistent in the moment but harder to read over the long run.";
+    type = "Balanced"; pattern = "No single pattern";
+    moment = "Less predictable"; overTime = "Less predictable";
+    momentWhy = "Your four scores are about equal, so in any moment you might respond from any of the four styles.";
+    overTimeWhy = "With no single pattern leading the way, people may find it harder to anticipate how you'll approach things over time.";
+    msg = "You can draw on every style. Naming what you need, and which style you're bringing to a situation, helps people work with you. Balanced profiles are rare. In PCI's experience, they often show up during a major shift in someone's life, and they usually don't stay balanced.";
+  } else if (split) {
+    type = "Split style";
+    moment = "Less predictable"; overTime = "Less predictable";
+    momentWhy = "Your primary and secondary styles, " + top + " and " + second + ", are opposite styles. You might respond from either one, and they approach things in very different ways, so people may find you harder to read in the moment.";
+    overTimeWhy = "Opposite styles don't combine into a single pattern, so over time you may move between two very different approaches.";
+    msg = "A split style means your top two styles sit on opposite sides of the I-OPT model. That gives you a wide range. It can help to tell people which style you're working from.";
   } else {
-    type = "Clear profile"; moment = "Predictable"; overTime = "Predictable";
-    msg = "Your " + top + " preferred style is clearly your starting point, and your " + pattern + " pattern shows up consistently over time. People who work with you usually know what to expect. Switching to other styles may take more deliberate effort, especially your less-used ones.";
+    moment = close ? "Less predictable" : "Predictable"; overTime = "Predictable";
+    momentWhy = close
+      ? "Your primary and secondary styles, " + top + " and " + second + ", are close, so you can respond from either one. That can make you harder to read in the moment."
+      : "Your primary style, " + top + ", is clearly your starting point, so people can usually anticipate your first response.";
+    overTimeWhy = "Over time, your profile looks most like the " + pattern + " pattern" + (focus ? ", which focuses on " + focus : "") + ", so you're more predictable over time.";
   }
-  const isBal = type === "Balanced" || type === "Balanced split";
-  return { sorted, top, second, third, s1, type, moment, overTime, msg, pattern, isBal, strong: !isBal && s1 > 20 };
+  const isBal = balanced;
+  return { sorted, top, second, third, s1, type, moment, overTime, momentWhy, overTimeWhy, msg, pattern, isBal, split, strong: !isBal && s1 > 20 };
 }
 
 // ---------------------------------------------------------------------------
@@ -261,13 +271,7 @@ function Pills({ items, value, onChange }: { items: [string, string][]; value: s
 function Logo() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <svg width="40" height="40" viewBox="0 0 100 100" aria-hidden="true">
-        <path d="M50 18 C50 18 28 36 28 57 C28 70 38 80 50 82 C62 80 72 70 72 57 C72 36 50 18 50 18Z" fill="#578B38" />
-        <path d="M50 28 C50 28 16 46 20 72 C22 84 36 90 50 82 C34 74 26 63 30 50 C34 37 50 28 50 28Z" fill="#455048" opacity={0.45} />
-        <path d="M50 28 C50 28 84 46 80 72 C78 84 64 90 50 82 C66 74 74 63 70 50 C66 37 50 28 50 28Z" fill="#B01B43" opacity={0.85} />
-        <circle cx="50" cy="54" r="9" fill="#578B38" />
-        <circle cx="50" cy="50" r="5" fill="#455048" opacity={0.35} />
-      </svg>
+      <img src="/images/peoplegro-lotus-logo.png" alt="" aria-hidden="true" style={{ width: 48, height: "auto" }} />
       <div>
         <div style={{ lineHeight: 1.1 }}>
           <span style={{ fontSize: 20, fontWeight: 400, color: "#578B38", fontFamily: FONT }}>people</span>
@@ -372,17 +376,26 @@ function Overview({ sc, a, goTap }: any) {
       <div style={{ ...col(14), borderTop: "1px solid " + C.line, paddingTop: 16 }}>
         <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
           <Shape sc={sc} a={a} />
-          <div style={{ ...col(8), flex: "1 1 160px" }}>
-            <span style={label}>Your profile type</span>
-            <b style={{ fontSize: 20 }}>{a.type}</b>
-            <div style={{ ...col(4), fontSize: 12 }}>
-              <span><b>In the moment:</b> {a.moment}</span>
-              <span><b>Over time:</b> {a.overTime}</span>
-              <span><b>Pattern:</b> {a.pattern}</span>
-            </div>
+          <div style={{ ...col(6), flex: "1 1 180px", fontSize: 13, lineHeight: 1.5 }}>
+            <span style={label}>Your profile</span>
+            {a.type && <b style={{ fontSize: 18 }}>{a.type}</b>}
+            {a.isBal ? <span>No single primary style</span> : <>
+              <span><b>Primary style:</b> <span style={{ color: STY[a.top as Code].color, fontWeight: "bold" }}>{a.top}</span>, {STY[a.top as Code].name}</span>
+              <span><b>Secondary style:</b> <span style={{ color: STY[a.second as Code].color, fontWeight: "bold" }}>{a.second}</span>, {STY[a.second as Code].name}</span>
+            </>}
+            <span><b>Strategic pattern:</b> {a.pattern}</span>
           </div>
         </div>
-        <div style={{ ...card(C.line, C.soft), fontSize: 14, lineHeight: 1.6 }}>{a.msg}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
+          {[["In the moment", a.moment, a.momentWhy], ["Over time", a.overTime, a.overTimeWhy]].map(([h, v, why]) => (
+            <div key={h} style={{ ...card(C.line, C.soft), gap: 4 }}>
+              <span style={label}>{h}</span>
+              <b style={{ fontSize: 15 }}>{v}</b>
+              <span style={{ fontSize: 13, lineHeight: 1.55 }}>{why}</span>
+            </div>
+          ))}
+        </div>
+        {a.msg && <div style={{ ...card(C.line, C.soft), fontSize: 14, lineHeight: 1.6 }}>{a.msg}</div>}
         {a.strong && (
           <div style={{ ...card(me.border, me.light), fontSize: 13, lineHeight: 1.6 }}>
             <b style={{ fontSize: 15, color: me.color }}>When your preferred style is strong</b>
@@ -392,13 +405,13 @@ function Overview({ sc, a, goTap }: any) {
           </div>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, fontSize: 12, lineHeight: 1.45 }}>
-          {[["Your preferred style", "Your most likely response to a new issue"], ["Your second preferred style", "Your next most likely response, if your preferred style doesn't fit"], ["Your less-used styles", "The ones you're least likely to reach for, though you can"], ["Your pattern (the dot)", "How you tend to behave over time"]].map(([h, t]) => (
+          {[["Your primary style", "Your most likely response to a new issue."], ["Your secondary style", "Your next most likely response, when an issue sticks around and your primary style doesn't fit."], ["Your less-used styles", "The ones you're least likely to reach for, though you can."], ["Your strategic pattern (the dot)", "The combination of your primary and secondary styles. How you tend to behave over time."]].map(([h, t]) => (
             <div key={h} style={{ border: "1px solid " + C.line, borderRadius: 10, padding: 10 }}><b>{h}</b><br />{t}</div>
           ))}
         </div>
         <div style={{ ...col(6), fontSize: 13, lineHeight: 1.55 }}>
           <b>How far apart your styles are matters</b>
-          <span>If your second style is close to your preferred style, moving between them is easy. If there's a big gap, that switch takes more deliberate effort, or help from someone who works from that style.</span>
+          <span>If your secondary style is close to your primary style, moving between them is easier. If there's a big gap, that switch takes more deliberate effort, or help from someone who works from that style.</span>
         </div>
         <div style={{ ...card("transparent", C.neutral), fontSize: 13, lineHeight: 1.55 }}>
           <b>Your profile can change</b>
@@ -415,13 +428,13 @@ function Overview({ sc, a, goTap }: any) {
 
       <div style={{ ...card(me.border), padding: 16, gap: 10 }}>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12 }}>
-          <span><b>Key idea:</b> {me.key}</span>
+          <span><b>Key idea:</b> {dot(me.key)}</span>
           <span><b>Motto:</b> "{me.motto}"</span>
         </div>
         <p style={p14}>{me.desc}</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, fontSize: 12, lineHeight: 1.5 }}>
           {[["What you bring", me.bring], ["Something to notice", me.watch], ["What motivates you", me.motivates], ["Your gift to the team", me.gift]].map(([h, t]) => (
-            <div key={h} style={{ background: C.soft, borderRadius: 10, padding: 10 }}><b style={{ color: me.color }}>{h}</b><br />{t}</div>
+            <div key={h} style={{ background: C.soft, borderRadius: 10, padding: 10 }}><b style={{ color: me.color }}>{h}</b><br />{dot(t)}</div>
           ))}
         </div>
       </div>
@@ -449,8 +462,8 @@ function CommTips({ a }: any) {
               <b style={{ color: s.color, fontSize: 15 }}>What tends to work with an {c}</b>
               {mine && <span style={{ fontSize: 10, letterSpacing: 1, textTransform: "uppercase", background: s.color, color: "#FFFFFF", borderRadius: 10, padding: "3px 8px" }}>What works with me</span>}
             </div>
-            <span style={{ fontSize: 12 }}><b>Words that land:</b> {s.words}</span>
-            {s.tips.map((t: string) => <div key={t} style={{ display: "flex", gap: 8, fontSize: 13, lineHeight: 1.45 }}><span style={{ color: s.color }}>•</span><span>{t}</span></div>)}
+            <span style={{ fontSize: 12 }}><b>Words that land:</b> {dot(s.words)}</span>
+            {s.tips.map((t: string) => <div key={t} style={{ display: "flex", gap: 8, fontSize: 13, lineHeight: 1.45 }}><span style={{ color: s.color }}>•</span><span>{dot(t)}</span></div>)}
           </div>
         );
       })}
@@ -475,28 +488,29 @@ function Behavior({ a }: any) {
         <div style={{ background: C.soft, borderRadius: 12, padding: 10 }}><b>Feelings</b><br />The story we tell</div>
       </div>
       <div style={col(8)}>
-        <span style={label}>Your behavioral characteristics</span>
+        <span style={label}>Behavior: your behavioral characteristics</span>
+        <p style={{ ...p13, color: C.sub }}>These are the behaviors others are most likely to see from you.</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {me.traits.map((t: string) => <span key={t} style={{ background: me.light, border: "1px solid " + me.border, color: me.color, borderRadius: 20, padding: "4px 10px", fontSize: 12, fontWeight: "bold" }}>{t}</span>)}
         </div>
       </div>
       <div style={col(8)}>
-        <span style={label}>How your behavior can be read</span>
-        <p style={{ ...p13, color: C.sub }}>The same behavior can land well or badly, depending on the other person's style and the moment.</p>
+        <span style={label}>Feelings: how your behavior can be interpreted</span>
+        <p style={{ ...p13, color: C.sub }}>When someone sees your behavior, they have an emotion, and then they tell themselves a story about it. That story is the feeling. The same behavior can be interpreted well or badly, depending on the other person's style and the moment.</p>
         {order.map(c => {
           const s = STY[c]; const mine = c === a.top;
           return (
             <div key={c} style={{ borderRadius: 12, padding: "10px 12px", background: mine ? s.light : "#FFFFFF", border: "1px solid " + (mine ? s.border : C.line) }}>
               <b style={{ color: s.color, fontSize: 13 }}>{c}{mine ? " (you)" : ""}</b>
-              <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 4 }}><b>Lands well:</b> {s.good}</div>
-              <div style={{ fontSize: 12, lineHeight: 1.5 }}><b>Causes friction:</b> {s.bad}</div>
+              <div style={{ fontSize: 12, lineHeight: 1.5, marginTop: 4 }}><b>Can be interpreted as:</b> {dot(s.good)}</div>
+              <div style={{ fontSize: 12, lineHeight: 1.5 }}><b>Or, when it causes friction:</b> {dot(s.bad)}</div>
             </div>
           );
         })}
       </div>
       <div style={{ ...card("transparent", C.soft), fontSize: 13, lineHeight: 1.55 }}>
         <b>Why reactions can feel so strong</b>
-        <span>The bigger the difference between your profile and someone else's, the more intense the reaction can be. And the stronger your preferred style, the stronger your response may be.</span>
+        <span>The bigger the difference between your profile and someone else's, the more likely you are to experience things differently. And the stronger your preferred style, the stronger your response may be.</span>
         <span>Doing things your way over time proves it works, so it starts to feel like the right way. PeopleGro calls this rightness blindness.</span>
       </div>
       <div style={{ ...card("transparent", C.neutral), fontSize: 13, lineHeight: 1.55 }}>
@@ -521,16 +535,29 @@ function Change({ a }: any) {
       <div style={{ border: "2px solid " + me.border, borderRadius: 16, padding: 16, ...col(12) }}>
         <b style={{ fontSize: 16, color: me.color }}>Your Change Snowflake ({a.top})</b>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-          <div style={{ background: me.light, borderRadius: 12, padding: 12, ...col(6) }}><b style={{ fontSize: 13 }}>Strengths in change</b>{me.snowS.map((t: string) => <span key={t} style={{ fontSize: 12, lineHeight: 1.4 }}>{t}</span>)}</div>
-          <div style={{ background: C.neutral, borderRadius: 12, padding: 12, ...col(6) }}><b style={{ fontSize: 13 }}>Challenges in change</b>{me.snowC.map((t: string) => <span key={t} style={{ fontSize: 12, lineHeight: 1.4 }}>{t}</span>)}</div>
+          <div style={{ background: me.light, borderRadius: 12, padding: 12, ...col(6) }}><b style={{ fontSize: 13 }}>Strengths in change</b>{me.snowS.map((t: string) => <span key={t} style={{ fontSize: 12, lineHeight: 1.4 }}>{dot(t)}</span>)}</div>
+          <div style={{ background: C.neutral, borderRadius: 12, padding: 12, ...col(6) }}><b style={{ fontSize: 13 }}>Challenges in change</b>{me.snowC.map((t: string) => <span key={t} style={{ fontSize: 12, lineHeight: 1.4 }}>{dot(t)}</span>)}</div>
         </div>
         <span style={{ fontSize: 11, color: C.muted }}>Change Snowflake © Professional Communications Inc.</span>
       </div>
       <div style={{ ...card(me.border, me.light), fontSize: 13, lineHeight: 1.55, gap: 4 }}>
         <b style={{ color: me.color }}>How you navigate change</b>
-        <span><b>You look for:</b> {me.changeLook}</span>
-        <span><b>You bring:</b> {me.changeBring}</span>
-        <span><b>Your pattern ({a.pattern}):</b> {PCHANGE[a.pattern] || "You may draw on different patterns depending on the change."}</span>
+        <span><b>You look for:</b> {dot(me.changeLook)}</span>
+        <span><b>You bring:</b> {dot(me.changeBring)}</span>
+      </div>
+      <div style={{ ...card(), fontSize: 13, lineHeight: 1.55 }}>
+        <b style={{ fontSize: 15 }}>Moving from styles to patterns</b>
+        <span>A pattern is the interrelationship between your primary and secondary styles. Your primary strategic pattern is the pattern of behavior that comes from applying these styles over time.</span>
+        <span>When an issue sticks around for a while, we find our primary style doesn't work for every situation, and we switch to our secondary style. You have access to all four styles, and a sweet spot.</span>
+        {!PCHANGE[a.pattern] && <span style={{ color: C.sub }}>{a.isBal ? "With a balanced profile, you may draw on any of these patterns, depending on the change." : "With a split style, your top two styles don't form a single pattern, so you may draw on different patterns depending on the change."}</span>}
+        {Object.keys(PCHANGE).map(n => {
+          const mine = n === a.pattern;
+          return (
+            <div key={n} style={{ borderRadius: 12, padding: "10px 12px", background: mine ? C.neutral : "#FFFFFF", border: mine ? "2px solid " + C.ink : "1px solid " + C.line }}>
+              <b>{n} ({PATTERNS.find(p => p.name === n)!.combo}){mine ? ", your pattern" : ""}</b><br />{PCHANGE[n].text}
+            </div>
+          );
+        })}
       </div>
       <div style={{ ...card("transparent", C.soft), fontSize: 13, lineHeight: 1.55 }}>
         <b>Understanding a change vs. accepting it</b>
@@ -538,10 +565,13 @@ function Change({ a }: any) {
         <span>Intellectual acceptance, understanding the change logically, usually comes first. Emotional acceptance takes longer, and it's where most people lose energy. Resisting a change tends to make the discomfort last longer.</span>
       </div>
       <span style={label}>Common reactions to change: the 4 D's</span>
+      <p style={{ ...p13, color: C.sub }}>Most people go through one or more of these during a change, big or little. They're normal reactions, not character flaws, and they can show up in you as well as in others.</p>
       {DEES.map(d => (
         <div key={d.name} style={{ ...card(), fontSize: 12, lineHeight: 1.5, gap: 3 }}>
           <b style={{ fontSize: 14 }}>{d.name}</b>
-          <span><b>What it can look like:</b> {d.looks}</span>
+          <span style={{ fontSize: 13 }}>{d.def}</span>
+          <span style={{ background: C.soft, borderRadius: 8, padding: "6px 8px" }}><b>Example:</b> {d.example}</span>
+          <span><b>What it can look like:</b> {dot(d.looks)}</span>
           <span><b>You might hear:</b> {d.hear}</span>
           <span><b>What can help:</b> {d.helps}</span>
         </div>
@@ -575,10 +605,10 @@ function Change({ a }: any) {
 // ---------------------------------------------------------------------------
 // Working With tab
 // ---------------------------------------------------------------------------
-function WorkingWithTab({ a, view, setView }: any) {
+function WorkingWithTab({ a, sc, view, setView }: any) {
   const [lens, setLens] = useState("Risk");
   const me = STY[a.top as Code];
-  const tapOrder = [a.second as Code].concat(ORDER.filter(c => c !== a.top && c !== a.second));
+  const tapOrder = (a.sorted as Code[]).filter(c => c !== a.top);
   return (
     <div style={col(16)}>
       <div style={col(4)}>
@@ -595,7 +625,7 @@ function WorkingWithTab({ a, view, setView }: any) {
             {ORDER.map(c => {
               const s = STY[c]; const mine = c === a.top;
               const t = lens === "Question" ? s.q : lens === "Motto" ? s.motto : s[lens];
-              return <div key={c} style={{ borderRadius: 12, padding: "10px 12px", background: mine ? s.light : "#FFFFFF", border: mine ? "2px solid " + s.color : "1px solid " + C.line }}><b style={{ color: s.color, fontSize: 12 }}>{c}{mine ? " (you)" : ""}</b><div style={{ fontSize: 13, lineHeight: 1.45, marginTop: 3 }}>{t}</div></div>;
+              return <div key={c} style={{ borderRadius: 12, padding: "10px 12px", background: mine ? s.light : "#FFFFFF", border: mine ? "2px solid " + s.color : "1px solid " + C.line }}><b style={{ color: s.color, fontSize: 12 }}>{c}{mine ? " (you)" : ""}</b><div style={{ fontSize: 13, lineHeight: 1.45, marginTop: 3 }}>{lens === "Question" ? t : dot(t)}</div></div>;
             })}
           </div>
         </div>
@@ -604,11 +634,15 @@ function WorkingWithTab({ a, view, setView }: any) {
       {view === "tap" && (
         <div style={col(12)}>
           <p style={p14}>Your preferred style is a good place to start. If it isn't getting the results you want, one option is to tap into a different approach. You might do that on your own, or reach out to a Jackalope: someone who shows up with wisdom, courage, and honest feedback, and who works from the style you need. Using a style outside your preferred style takes more energy, and that's normal.</p>
+          <div style={{ ...card("transparent", C.neutral), fontSize: 13, lineHeight: 1.55 }}>
+            <b>Your scores make a difference</b>
+            <span>Your scores show how easy or comfortable it may be for you to tap into another style. The closer a style's score is to your preferred style, the more natural it may feel. A style with a low score may take more effort and energy, or it may be a good time to reach out to a Jackalope. The styles below are listed from your highest score to your lowest.</span>
+          </div>
           {tapOrder.map(c => {
             const s = STY[c];
             return (
               <div key={c} style={card(s.border)}>
-                <b style={{ color: s.color, fontSize: 15 }}>Tap into {c} when...</b>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}><b style={{ color: s.color, fontSize: 15 }}>Tap into {c} when...</b><span style={{ fontSize: 12, color: C.muted }}>Your {c} score: {sc[c]}</span></div>
                 <span style={{ fontSize: 13, lineHeight: 1.5 }}>{s.when}</span>
                 <div style={{ background: s.light, borderRadius: 10, padding: 10, fontSize: 13, lineHeight: 1.5 }}><b>What it might look like:</b> {s.looks}</div>
               </div>
@@ -622,8 +656,8 @@ function WorkingWithTab({ a, view, setView }: any) {
           <div style={{ ...card(me.border, me.light), fontSize: 13, lineHeight: 1.55 }}>
             <b style={{ fontSize: 15, color: me.color }}>Under stress</b>
             <span>Each style tends to show up in a recognizable way under pressure. Knowing what that looks like for you helps you catch it early.</span>
-            <span><b>You may:</b> {me.stress}</span>
-            <span><b>What triggers it:</b> {me.trigger}</span>
+            <span><b>You may:</b> {dot(me.stress)}</span>
+            <span><b>What triggers it:</b> {dot(me.trigger)}</span>
           </div>
           <div style={{ ...card(), fontSize: 13, lineHeight: 1.55 }}>
             <b style={{ fontSize: 15 }}>How you listen</b>
@@ -635,7 +669,7 @@ function WorkingWithTab({ a, view, setView }: any) {
             {LEVELS.map(([n, t], i) => (
               <div key={n} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, lineHeight: 1.45 }}>
                 <span style={{ minWidth: 24, height: 24, borderRadius: 12, background: C.neutral, color: C.ink, fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>{i + 1}</span>
-                <span><b>{n}:</b> {t}</span>
+                <span><b>{n}:</b> {dot(t)}</span>
               </div>
             ))}
             <span style={{ fontSize: 11, color: C.muted }}>Adapted from The Black Swan Group</span>
@@ -649,7 +683,7 @@ function WorkingWithTab({ a, view, setView }: any) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, textAlign: "center" }}>
             {ORDER.map(c => <div key={c} style={{ background: STY[c].light, border: "1px solid " + STY[c].border, borderRadius: 12, padding: "10px 6px" }}><b style={{ color: STY[c].color, fontSize: 13 }}>{c}</b><div style={{ fontSize: 18, fontWeight: "bold", marginTop: 2 }}>{STY[c].q}</div></div>)}
           </div>
-          <div style={{ background: C.soft, borderRadius: 14, padding: "12px 14px", fontSize: 13, lineHeight: 1.55 }}><b>Team tip:</b> Before a big decision, you might ask all four out loud. When will we act? How will it work? What are we doing, and what if it changes? Why this option? If one has no good answer yet, you've found the gap.</div>
+          <div style={{ background: C.soft, borderRadius: 14, padding: "12px 14px", fontSize: 13, lineHeight: 1.55 }}><b>Team tip:</b> Before a big decision, you might ask all four out loud. When will we act? How will it work? Why this option? What are we doing, and what if it changes? If one has no good answer yet, you've found the gap.</div>
           <b style={{ fontSize: 15 }}>From you ({a.top}) to each style</b>
           <span style={{ fontSize: 12, color: C.sub }}>Slow down and make sure your words mean the same thing to them. Slower is faster.</span>
           {ORDER.map(c => <div key={c} style={{ border: "1px solid " + STY[c].border, borderRadius: 14, padding: "12px 14px", fontSize: 13, lineHeight: 1.5 }}><b style={{ color: STY[c].color }}>To {c === a.top ? "another" : "an"} {c} ({STY[c].q})</b><br />{TO[a.top as Code][c]}</div>)}
@@ -658,7 +692,7 @@ function WorkingWithTab({ a, view, setView }: any) {
 
       {view === "patterns" && (
         <div style={col(12)}>
-          <p style={p14}>Your strategic pattern is the combination of your preferred style and second preferred style. It describes how you tend to work and lead over time.</p>
+          <p style={p14}>Your strategic pattern is the combination of your primary and secondary styles. It describes how you tend to work and lead over time.</p>
           {PATTERNS.map(p => {
             const mine = a.pattern.indexOf(p.name) >= 0;
             return (
@@ -670,7 +704,7 @@ function WorkingWithTab({ a, view, setView }: any) {
             );
           })}
           <b style={{ fontSize: 15, marginTop: 6 }}>Working across styles</b>
-          {PAIRS.map(([pair, text]) => <div key={pair} style={{ fontSize: 13, lineHeight: 1.5, borderRadius: 10, padding: "9px 12px", background: pair.indexOf(a.top) >= 0 ? me.light : C.soft }}><b>{pair}</b> {text}</div>)}
+          {PAIRS.map(([pair, text, friction]) => <div key={pair} style={{ ...col(4), fontSize: 13, lineHeight: 1.5, borderRadius: 10, padding: "9px 12px", background: pair.indexOf(a.top) >= 0 ? me.light : C.soft }}><span><b>{pair}</b> {text}</span><span><b>Possible friction points:</b> {friction}</span></div>)}
           <span style={{ fontSize: 12, color: C.sub }}>Sharing a style means you use words the same way. It doesn't mean you'll agree, and misfires still happen.</span>
         </div>
       )}
@@ -719,16 +753,25 @@ function PracticeTab() {
           <b style={{ ...label, color: C.ink, fontSize: 13 }}>Self-Awareness: going deeper</b>
           <b style={{ fontSize: 16 }}>5. Where might you be stuck?</b>
           <span style={{ fontSize: 13, lineHeight: 1.55, color: C.sub }}>Mental models work like a pane of glass, framing and quietly distorting what we see. Do any of these feel like they might be at play?</span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {STUCK.map(([n]) => <button key={n} aria-pressed={!!stuck[n]} onClick={() => setStuck({ ...stuck, [n]: !stuck[n] })} style={{ ...pillStyle(!!stuck[n]), fontSize: 12 }}>{n}</button>)}
+          <span style={{ fontSize: 12, color: C.sub }}>Tap one to see questions that can help you get unstuck.</span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 8, alignItems: "start" }}>
+            {STUCK.map(([n, def, qs]) => {
+              const on = !!stuck[n];
+              return (
+                <button key={n} aria-expanded={on} onClick={() => setStuck({ ...stuck, [n]: !on })} style={{ textAlign: "left", fontFamily: FONT, color: C.ink, cursor: "pointer", borderRadius: 12, padding: "10px 12px", background: on ? C.neutral : "#FFFFFF", border: on ? "2px solid " + C.ink : "1px solid " + C.line, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <b style={{ fontSize: 13 }}>{n}</b>
+                  <span style={{ fontSize: 12, lineHeight: 1.45, color: C.sub }}>{def}</span>
+                  {on && <span style={{ fontSize: 12, lineHeight: 1.5 }}><b>Questions to get unstuck:</b>{qs.map(q => <span key={q} style={{ display: "block" }}>• {q}</span>)}</span>}
+                </button>
+              );
+            })}
           </div>
-          {STUCK.filter(([n]) => stuck[n]).map(([n, q]) => <div key={n} style={{ background: C.neutral, borderRadius: 12, padding: "10px 12px", fontSize: 13, lineHeight: 1.5 }}><b>{n}:</b> {q}</div>)}
           <b style={{ fontSize: 16 }}>6. Is processing style at play?</b>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, fontSize: 12, lineHeight: 1.4 }}>
             <div style={{ border: "1px solid " + C.line, borderRadius: 12, padding: 10 }}><b>How do they take in information?</b><br />Step by step / They jump around and make connections</div>
             <div style={{ border: "1px solid " + C.line, borderRadius: 12, padding: 10 }}><b>What do they do with it?</b><br />Act and get things done / Think and plan first</div>
           </div>
-          <span style={{ fontSize: 12, color: C.sub }}>Check: do they usually ask When, How, What, or Why first? The Working With tab shows how your style and theirs tend to work together.</span>
+          <span style={{ fontSize: 12, color: C.sub }}>Check: do they usually ask When, How, Why, or What first? The Working With tab shows how your style and theirs tend to work together.</span>
           <b style={{ ...label, color: C.ink, fontSize: 13 }}>Self-Management: going deeper</b>
           <b style={{ fontSize: 16 }}>7. The four questions</b>
           <div style={{ fontSize: 13, lineHeight: 1.6 }}>What do I want for myself? For the other person? For our relationship? For our team or organization?</div>
@@ -771,8 +814,9 @@ function ReportsTab({ a, email }: any) {
       ))}
       <div style={card()}>
         <b style={{ fontSize: 15 }}>Your summary</b>
-        <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Preferred style:</b> {a.isBal ? "No single preferred style" : a.top + ", " + STY[a.top as Code].name}</span>
-        <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Profile type:</b> {a.type}</span>
+        <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Primary style:</b> {a.isBal ? "No single primary style" : a.top + ", " + STY[a.top as Code].name}</span>
+        {!a.isBal && <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Secondary style:</b> {a.second + ", " + STY[a.second as Code].name}</span>}
+        {a.type && <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Profile type:</b> {a.type}</span>}
         <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Pattern:</b> {a.pattern}</span>
         <span style={{ fontSize: 13, lineHeight: 1.6 }}><b>Your question:</b> {STY[a.top as Code].q}</span>
       </div>
@@ -813,7 +857,7 @@ function ResourcesTab() {
                 ))}
                 {(r.imgs || []).map(im => <img key={im.src} src={im.src} alt={im.alt} style={{ width: "100%", maxWidth: 440, border: "1px solid " + C.line, borderRadius: 10, background: "#FFFFFF" }} />)}
                 {(r.paras || []).map(p => <p key={p} style={{ margin: 0 }}>{p}</p>)}
-                {(r.list || []).map(l => <div key={l} style={{ display: "flex", gap: 8 }}><span>•</span><span>{l}</span></div>)}
+                {(r.list || []).map(l => <div key={l} style={{ display: "flex", gap: 8 }}><span>•</span><span>{dot(l)}</span></div>)}
                 {(r.after || []).map(p => <p key={p} style={{ margin: 0 }}>{p}</p>)}
                 {(r.links || []).map(l => <a key={l.href} href={l.href} target="_blank" rel="noreferrer" style={{ alignSelf: "flex-start", background: C.ink, color: "#FFFFFF", borderRadius: 20, padding: "10px 16px", textDecoration: "none", fontSize: 13 }}>{l.text}</a>)}
               </div>
@@ -935,7 +979,7 @@ export default function App() {
       </div>
       <div style={{ padding: "20px 22px 28px" }}>
         {tab === "Profile" && <ProfileTab sc={sc} a={a} goTap={goTap} />}
-        {tab === "Working With" && <WorkingWithTab a={a} view={wwView} setView={setWwView} />}
+        {tab === "Working With" && <WorkingWithTab a={a} sc={sc} view={wwView} setView={setWwView} />}
         {tab === "Practice" && <PracticeTab />}
         {tab === "Reports" && <ReportsTab a={a} email={email} />}
         {tab === "Resources" && <ResourcesTab />}
