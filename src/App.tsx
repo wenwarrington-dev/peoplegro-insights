@@ -235,7 +235,7 @@ function analyze(sc: Record<Code, number>) {
     moment = "Less predictable"; overTime = "Less predictable";
     momentWhy = "Your four scores are about equal, so in any moment you might respond from any of the four styles.";
     overTimeWhy = "With no single pattern leading the way, people may find it harder to anticipate how you'll approach things over time.";
-    msg = "You can draw on every style. Naming what you need, and which style you're bringing to a situation, helps people work with you. Balanced profiles are rare. In PCI's experience, they often show up during a major shift in someone's life, and they usually don't stay balanced.";
+    msg = "You can draw on every style. Naming what you need, and which style you're bringing to a situation, helps people work with you. Balanced profiles are rare, and some people work successfully from a balanced profile all the time.";
   } else if (split) {
     type = "Split style"; pattern = "Split (" + top + " and " + second + ")";
     moment = "Less predictable"; overTime = "Less predictable";
