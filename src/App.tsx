@@ -237,11 +237,11 @@ function analyze(sc: Record<Code, number>) {
     overTimeWhy = "With no single pattern leading the way, people may find it harder to anticipate how you'll approach things over time.";
     msg = "You can draw on every style. Naming what you need, and which style you're bringing to a situation, helps people work with you. Balanced profiles are rare. In PCI's experience, they often show up during a major shift in someone's life, and they usually don't stay balanced.";
   } else if (split) {
-    type = "Split style";
+    type = "Split style"; pattern = "Split (" + top + " and " + second + ")";
     moment = "Less predictable"; overTime = "Less predictable";
     momentWhy = "Your primary and secondary styles, " + top + " and " + second + ", are opposite styles. You might respond from either one, and they approach things in very different ways, so people may find you harder to read in the moment.";
-    overTimeWhy = "Opposite styles don't combine into a single pattern, so over time you may move between two very different approaches.";
-    msg = "A split style means your top two styles sit on opposite sides of the I-OPT model. That gives you a wide range. It can help to tell people which style you're working from.";
+    overTimeWhy = "Opposite styles don't combine into one of the four patterns, so your pattern is split. Over time you may move between two very different approaches.";
+    msg = "A split style means your top two styles sit on opposite sides of the I-OPT model, so your profile is nearly balanced. That gives you a wide range. It can help to tell people which style you're working from.";
   } else {
     moment = close ? "Less predictable" : "Predictable"; overTime = "Predictable";
     momentWhy = close
@@ -549,7 +549,7 @@ function Change({ a }: any) {
         <b style={{ fontSize: 15 }}>Moving from styles to patterns</b>
         <span>A pattern is the interrelationship between your primary and secondary styles. Your primary strategic pattern is the pattern of behavior that comes from applying these styles over time.</span>
         <span>When an issue sticks around for a while, we find our primary style doesn't work for every situation, and we switch to our secondary style. You have access to all four styles, and a sweet spot.</span>
-        {!PCHANGE[a.pattern] && <span style={{ color: C.sub }}>{a.isBal ? "With a balanced profile, you may draw on any of these patterns, depending on the change." : "With a split style, your top two styles don't form a single pattern, so you may draw on different patterns depending on the change."}</span>}
+        {!PCHANGE[a.pattern] && <span style={{ color: C.sub }}>{a.isBal ? "With a balanced profile, you may draw on any of these patterns, depending on the change." : "With a split style, your pattern is split and your profile is nearly balanced, so you may draw on different patterns depending on the change."}</span>}
         {Object.keys(PCHANGE).map(n => {
           const mine = n === a.pattern;
           return (
